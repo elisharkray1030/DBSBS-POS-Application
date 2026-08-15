@@ -39,7 +39,7 @@ class InvalidSettlement(PosError):
 
 
 class ItemNotFound(PosError):
-    """Raised when an item name does not exist in the catalog."""
+    """Raised when an item ID does not exist in the catalog."""
 
 
 class ItemSoldOut(PosError):
@@ -74,6 +74,11 @@ class Item:
     `item_id` is the item's canonical identity, carried from the organizer's
     Stock sheet (CONTEXT.md: Item ID). It is unique within the sheet and never
     assigned in-app.
+
+    `raw_cells` holds the ItemID, ItemName, Price, and Inventory cells exactly
+    as the master file delivered them (before any stripping or parsing). The
+    Stock sheet report writes them back verbatim so the master file's data
+    round-trips untouched. It is None only for items not built from a file.
     """
 
     item_id: str
@@ -81,6 +86,7 @@ class Item:
     price: Money
     starting_quantity: int | None = None
     sold_out: bool = False
+    raw_cells: tuple[str, str, str, str] | None = None
 
 
 @dataclass
@@ -190,9 +196,9 @@ class Settings:
             and bool(self.catalog)
         )
 
-    def item(self, name: str) -> Item | None:
+    def item_by_id(self, item_id: str) -> Item | None:
         for item in self.catalog:
-            if item.name == name:
+            if item.item_id == item_id:
                 return item
         return None
 
@@ -226,6 +232,6 @@ class EndOfDay:
     expected_cash: Money
     octopus_total: Money
     voucher_total: Money
-    sold_counts: dict[str, int]
+    sold_counts: dict[str, int]  # keyed by Item ID
     voids: list[Sale]
     cash_adjustments: list[CashAdjustment]

@@ -11,10 +11,10 @@ from pos.sqlite import SqlitePersistence
 
 T0 = datetime(2026, 8, 15, 9, 0, 0)
 CATALOG_CSV = (
-    "ItemID, ItemName, Price, Inventory, Sales, Revenue\n"
-    "MUG, Mug, 60, 20, 30, 1800\n"
-    "BDG, Badge, 15, 50, 10, 150\n"
-    "PLUSH, Plush Bear, 120, , 5, 600\n"
+    "ItemID,ItemName,Price,Inventory,Sales,Revenue\n"
+    "MUG,Mug,60,20,30,1800\n"
+    "BDG,Badge,15,50,10,150\n"
+    "PLUSH,Plush Bear,120,,5,600\n"
 )
 
 

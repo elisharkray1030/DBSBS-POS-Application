@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS catalog (
     name              TEXT NOT NULL,
     price             TEXT NOT NULL,
     starting_quantity INTEGER,
-    sold_out          INTEGER NOT NULL DEFAULT 0
+    sold_out          INTEGER NOT NULL DEFAULT 0,
+    raw_cells         TEXT
 );
 CREATE TABLE IF NOT EXISTS sales (
     seq         INTEGER PRIMARY KEY,
@@ -103,7 +104,16 @@ class SqlitePersistence:
         self._conn = sqlite3.connect(str(db_path))
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(_SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Bring pre-raw_cells device databases up to the current schema."""
+        columns = {
+            row["name"] for row in self._conn.execute("PRAGMA table_info(catalog)")
+        }
+        if "raw_cells" not in columns:
+            self._conn.execute("ALTER TABLE catalog ADD COLUMN raw_cells TEXT")
 
     def close(self) -> None:
         self._conn.close()
@@ -124,7 +134,8 @@ class SqlitePersistence:
                 settings.last_export_at = _parse_dt(row["value"])
                 found = True
         rows = self._conn.execute(
-            "SELECT item_id, name, price, starting_quantity, sold_out FROM catalog"
+            "SELECT item_id, name, price, starting_quantity, sold_out, raw_cells"
+            " FROM catalog"
         ).fetchall()
         if not rows and not found:
             return None
@@ -135,6 +146,11 @@ class SqlitePersistence:
                 price=money(row["price"]),
                 starting_quantity=row["starting_quantity"],
                 sold_out=bool(row["sold_out"]),
+                raw_cells=(
+                    tuple(json.loads(row["raw_cells"]))
+                    if row["raw_cells"] is not None
+                    else None
+                ),
             )
             for row in rows
         ]
@@ -166,8 +182,8 @@ class SqlitePersistence:
             )
             self._conn.execute("DELETE FROM catalog")
             self._conn.executemany(
-                "INSERT INTO catalog (item_id, name, price, starting_quantity, sold_out)"
-                " VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO catalog (item_id, name, price, starting_quantity, sold_out, raw_cells)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
                 [
                     (
                         item.item_id,
@@ -175,6 +191,9 @@ class SqlitePersistence:
                         str(item.price),
                         item.starting_quantity,
                         1 if item.sold_out else 0,
+                        json.dumps(list(item.raw_cells))
+                        if item.raw_cells is not None
+                        else None,
                     )
                     for item in settings.catalog
                 ],

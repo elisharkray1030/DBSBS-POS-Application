@@ -52,8 +52,8 @@ def test_report_one_row_per_item_in_master_order(configured_session, tmp_path):
 
 
 def test_report_sales_and_revenue_from_recorded_sales(configured_session, tmp_path):
-    configured_session.add_item_to_sale("Mug", 2)
-    configured_session.add_item_to_sale("Badge", 3)
+    configured_session.add_item_to_sale("MUG", 2)
+    configured_session.add_item_to_sale("BDG", 3)
     configured_session.settle_current_sale(
         [Tender(CASH, Decimal("165"), tendered=Decimal("165"))]
     )
@@ -64,7 +64,7 @@ def test_report_sales_and_revenue_from_recorded_sales(configured_session, tmp_pa
 
 
 def test_report_reflects_corrections_in_final_state(configured_session, tmp_path):
-    configured_session.add_item_to_sale("Mug", 2)
+    configured_session.add_item_to_sale("MUG", 2)
     configured_session.settle_current_sale(
         [Tender(CASH, Decimal("120"), tendered=Decimal("120"))]
     )
@@ -78,11 +78,11 @@ def test_report_reflects_corrections_in_final_state(configured_session, tmp_path
 
 
 def test_report_excludes_voids(configured_session, tmp_path):
-    configured_session.add_item_to_sale("Mug", 1)
+    configured_session.add_item_to_sale("MUG", 1)
     configured_session.settle_current_sale(
         [Tender(CASH, Decimal("60"), tendered=Decimal("60"))]
     )
-    configured_session.add_item_to_sale("Badge", 1)
+    configured_session.add_item_to_sale("BDG", 1)
     configured_session.settle_current_sale([Tender(OCTOPUS, Decimal("15"))])
     configured_session.void_sale(1)
     rows = report_rows(configured_session, tmp_path)
@@ -94,3 +94,41 @@ def test_master_file_is_never_modified(configured_session, catalog_file, tmp_pat
     original = catalog_file.read_text(encoding="utf-8")
     configured_session.export_csv(tmp_path)
     assert catalog_file.read_text(encoding="utf-8") == original
+
+
+def test_report_echoes_raw_cells_verbatim(session, tmp_path):
+    sheet = tmp_path / "stock.csv"
+    sheet.write_text(
+        "ItemID,ItemName,Price,Inventory,Sales,Revenue\n"
+        "MUG,  Mug  ,60.00,020,0,0\n"
+        "BDG,Badge,15.0,50,0,0\n",
+        encoding="utf-8",
+    )
+    session.set_device_name("Till A")
+    session.set_float(500)
+    session.load_catalog(sheet)
+    report = [p for p in session.export_csv(tmp_path) if p.name.startswith("stocks-")]
+    assert len(report) == 1
+    rows = read_rows(report[0])
+    assert rows[1] == ["MUG", "  Mug  ", "60.00", "020", "0", "0"]
+    assert rows[2] == ["BDG", "Badge", "15.0", "50", "0", "0"]
+
+
+def test_duplicate_names_trace_to_the_right_master_row(session, tmp_path):
+    sheet = tmp_path / "stock.csv"
+    sheet.write_text(
+        "ItemID,ItemName,Price,Inventory,Sales,Revenue\n"
+        "MUG-A,Mug,60,10,0,0\n"
+        "MUG-B,Mug,90,10,0,0\n",
+        encoding="utf-8",
+    )
+    session.set_device_name("Till A")
+    session.set_float(500)
+    session.load_catalog(sheet)
+    session.add_item_to_sale("MUG-B", 1)
+    session.settle_current_sale([Tender(CASH, Decimal("90"), tendered=Decimal("90"))])
+    report = [p for p in session.export_csv(tmp_path) if p.name.startswith("stocks-")]
+    assert len(report) == 1
+    rows = {r[0]: r for r in read_rows(report[0])[1:]}
+    assert rows["MUG-A"][4:] == ["0", "0"]
+    assert rows["MUG-B"][4:] == ["1", "90"]

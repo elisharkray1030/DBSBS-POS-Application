@@ -241,18 +241,21 @@ class CorrectionDialog(tk.Toplevel):
             text=f"Sale #{seq} — edit the items and settlement, then save.",
         ).pack(padx=12, pady=(12, 4))
 
-        self.lines: list[tuple[str, str, Decimal]] = [
-            (line.item_id, line.item_name, line.price) for line in sale.line_items
-        ]
-        self.row_vars: list[tuple[str, str, Decimal, tk.StringVar]] = []
+        self.lines: list[LineItem] = list(sale.line_items)
+        self.row_vars: list[tuple[LineItem, tk.StringVar]] = []
 
         self.rows = ttk.Frame(self)
         self.rows.pack(fill="both", expand=True, padx=12)
 
         add_row = ttk.Frame(self)
         add_row.pack(fill="x", padx=12, pady=(4, 0))
+        self._combo_items = {
+            f"{i.item_id} — {i.name}": i for i in session.list_items()
+        }
         self.item_combo = ttk.Combobox(
-            add_row, values=[i.name for i in session.list_items()], width=16
+            add_row,
+            values=list(self._combo_items),
+            width=16,
         )
         self.item_combo.pack(side="left")
         self.add_qty = ttk.Entry(add_row, width=4)
@@ -277,30 +280,30 @@ class CorrectionDialog(tk.Toplevel):
         for child in self.rows.winfo_children():
             child.destroy()
         self.row_vars = []
-        for item_id, name, price in self.lines:
-            var = tk.StringVar(value="1")
+        for line in self.lines:
+            var = tk.StringVar(value=str(line.quantity))
             var.trace_add("write", lambda *_: self._recompute_total())
             row = ttk.Frame(self.rows)
             row.pack(fill="x")
-            ttk.Label(row, text=name, width=18, anchor="w").pack(side="left")
-            ttk.Label(row, text=f"${fmt(price)}", width=8).pack(side="left")
+            ttk.Label(row, text=line.item_name, width=18, anchor="w").pack(side="left")
+            ttk.Label(row, text=f"${fmt(line.price)}", width=8).pack(side="left")
             ttk.Entry(row, textvariable=var, width=5).pack(side="left", padx=4)
             ttk.Button(
                 row,
                 text="Remove",
-                command=lambda n=name: self._remove_line(n),  # type: ignore[misc]
+                command=lambda item_id=line.item_id: self._remove_line(item_id),  # type: ignore[misc]
             ).pack(side="right")
-            self.row_vars.append((item_id, name, price, var))
+            self.row_vars.append((line, var))
         self._recompute_total()
 
     def _current_total(self) -> Decimal:
         total = Decimal("0")
-        for item_id, name, price, var in self.row_vars:
+        for line, var in self.row_vars:
             try:
                 qty = int(var.get())
             except ValueError:
                 qty = 0
-            total += LineItem(item_id, name, max(qty, 0), price).total
+            total += LineItem(line.item_id, line.item_name, max(qty, 0), line.price).total
         return total
 
     def _recompute_total(self) -> None:
@@ -309,26 +312,32 @@ class CorrectionDialog(tk.Toplevel):
         self.section.set_total(total)
 
     def _add_line(self) -> None:
-        name = self.item_combo.get()
-        if not name:
-            return
-        item = next(
-            (i for i in self.session.list_items() if i.name == name), None
-        )
+        item = self._combo_items.get(self.item_combo.get())
         if item is None:
             return
-        self.lines.append((item.item_id, name, item.price))
+        try:
+            quantity = int(self.add_qty.get())
+        except ValueError:
+            quantity = 1
+        if quantity <= 0:
+            return
+        for line in self.lines:
+            if line.item_id == item.item_id:
+                line.quantity += quantity
+                self._rebuild_rows()
+                return
+        self.lines.append(LineItem(item.item_id, item.name, quantity, item.price))
         self._rebuild_rows()
 
-    def _remove_line(self, name: str) -> None:
-        self.lines = [(i, n, p) for i, n, p in self.lines if n != name]
+    def _remove_line(self, item_id: str) -> None:
+        self.lines = [line for line in self.lines if line.item_id != item_id]
         self._rebuild_rows()
 
     def _save(self) -> None:
         try:
             line_items = [
-                LineItem(item_id, name, int(var.get()), price)
-                for item_id, name, price, var in self.row_vars
+                LineItem(line.item_id, line.item_name, int(var.get()), line.price)
+                for line, var in self.row_vars
             ]
             self.session.correct_sale(
                 self.seq, line_items, self.section.build_tenders()

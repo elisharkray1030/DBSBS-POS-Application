@@ -16,7 +16,7 @@ from pos.domain import CASH, PosError, Tender
 
 
 def _sell(configured_session):
-    configured_session.add_item_to_sale("Mug", 1)
+    configured_session.add_item_to_sale("MUG", 1)
     configured_session.settle_current_sale(
         [Tender(CASH, Decimal("60"), tendered=Decimal("60"))]
     )
@@ -66,7 +66,7 @@ def test_wipe_blocked_after_a_sale_made_following_the_export(
     _sell(configured_session)
     configured_session.export_csv(tmp_path)
     clock.advance(minutes=10)
-    configured_session.add_item_to_sale("Badge", 1)
+    configured_session.add_item_to_sale("BDG", 1)
     configured_session.settle_current_sale(
         [Tender(CASH, Decimal("15"), tendered=Decimal("15"))]
     )
@@ -85,7 +85,7 @@ def test_sequence_numbers_restart_after_wipe(configured_session, catalog_file, t
     configured_session.set_device_name("Till A")
     configured_session.set_float(500)
     configured_session.load_catalog(catalog_file)
-    configured_session.add_item_to_sale("Mug", 1)
+    configured_session.add_item_to_sale("MUG", 1)
     result = configured_session.settle_current_sale(
         [Tender(CASH, Decimal("60"), tendered=Decimal("60"))]
     )

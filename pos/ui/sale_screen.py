@@ -123,6 +123,7 @@ class SaleScreen(ttk.Frame):
             self.sale_tree.insert(
                 "",
                 "end",
+                iid=line.item_id,
                 values=(line.item_name, line.quantity, fmt(line.total)),
             )
         self.total_var.set(f"Total: ${fmt(self.session.current_sale_total())}")
@@ -132,56 +133,56 @@ class SaleScreen(ttk.Frame):
             f"Takings: ${fmt(summary.takings)}   Sales: {summary.sale_count}"
         )
 
-    def _selected_item_name(self):
+    def _selected_item_id(self):
         selection = self.item_tree.selection()
         if not selection:
             return None
-        return self.item_tree.item(selection[0], "values")[1]
+        return self.item_tree.item(selection[0], "values")[0]
 
     def _add_to_sale(self) -> None:
-        name = self._selected_item_name()
-        if name is None:
+        item_id = self._selected_item_id()
+        if item_id is None:
             return
         try:
-            self.session.add_item_to_sale(name, int(self.qty_var.get()))
+            self.session.add_item_to_sale(item_id, int(self.qty_var.get()))
         except (PosError, ValueError) as exc:
             show_error("Cannot add item", exc)
         self.refresh()
 
     def _toggle_sold_out(self) -> None:
-        name = self._selected_item_name()
-        if name is None:
+        item_id = self._selected_item_id()
+        if item_id is None:
             return
         try:
-            if self.session.is_sold_out(name):
-                self.session.unmark_sold_out(name)
+            if self.session.is_sold_out(item_id):
+                self.session.unmark_sold_out(item_id)
             else:
-                self.session.mark_sold_out(name)
+                self.session.mark_sold_out(item_id)
         except PosError as exc:
             show_error("Cannot change sold-out", exc)
         self.refresh()
 
-    def _selected_sale_item(self):
+    def _selected_sale_item_id(self):
         selection = self.sale_tree.selection()
         if not selection:
             return None
-        return self.sale_tree.item(selection[0], "values")[0]
+        return selection[0]
 
     def _set_qty(self) -> None:
-        name = self._selected_sale_item()
-        if name is None:
+        item_id = self._selected_sale_item_id()
+        if item_id is None:
             return
         try:
-            self.session.set_sale_quantity(name, int(self.sale_qty_var.get()))
+            self.session.set_sale_quantity(item_id, int(self.sale_qty_var.get()))
         except (PosError, ValueError) as exc:
             show_error("Cannot set quantity", exc)
         self.refresh()
 
     def _remove_from_sale(self) -> None:
-        name = self._selected_sale_item()
-        if name is None:
+        item_id = self._selected_sale_item_id()
+        if item_id is None:
             return
-        self.session.set_sale_quantity(name, 0)
+        self.session.set_sale_quantity(item_id, 0)
         self.refresh()
 
     def _new_sale(self) -> None:

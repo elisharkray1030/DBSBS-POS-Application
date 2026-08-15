@@ -39,8 +39,9 @@ class EndOfDayScreen(ttk.Frame):
         sold.heading("item", text="Item")
         sold.heading("count", text="Sold")
         sold.pack(fill="x", pady=(2, 6))
-        for name, count in figures.sold_counts.items():
-            sold.insert("", "end", values=(name, count))
+        name_by_id = {i.item_id: i.name for i in self.session.list_items()}
+        for item_id, count in figures.sold_counts.items():
+            sold.insert("", "end", values=(name_by_id.get(item_id, item_id), count))
 
         ttk.Label(self, text="Voids").pack(anchor="w")
         voids = ttk.Treeview(self, columns=("seq", "time", "total"), show="headings", height=5)

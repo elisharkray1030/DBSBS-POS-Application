@@ -36,8 +36,8 @@ def test_cash_removal_is_recorded_with_time_and_reason(configured_session):
 
 
 def test_expected_cash_reflects_float_plus_sales_and_adjustments(configured_session):
-    settle(configured_session, "Mug", 1, Decimal("60"))
-    settle(configured_session, "Badge", 2, Decimal("30"))
+    settle(configured_session, "MUG", 1, Decimal("60"))
+    settle(configured_session, "BDG", 2, Decimal("30"))
     configured_session.record_cash_adjustment(200, "Topping up change")
     configured_session.record_cash_adjustment(-50, "Removing excess notes")
     end_of_day = configured_session.end_of_day()
@@ -45,8 +45,8 @@ def test_expected_cash_reflects_float_plus_sales_and_adjustments(configured_sess
 
 
 def test_running_summary_excludes_voids(configured_session):
-    settle(configured_session, "Mug", 1, Decimal("60"))
-    settle(configured_session, "Badge", 1, Decimal("15"))
+    settle(configured_session, "MUG", 1, Decimal("60"))
+    settle(configured_session, "BDG", 1, Decimal("15"))
     configured_session.void_sale(1)
     summary = configured_session.running_summary()
     assert summary.takings == Decimal("15")
@@ -54,7 +54,7 @@ def test_running_summary_excludes_voids(configured_session):
 
 
 def test_running_summary_reflects_corrections_final_state(configured_session):
-    settle(configured_session, "Mug", 1, Decimal("60"))
+    settle(configured_session, "MUG", 1, Decimal("60"))
     from tests.helpers import line_item
 
     configured_session.correct_sale(

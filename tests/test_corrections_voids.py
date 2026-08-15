@@ -23,7 +23,7 @@ def settle_cash(configured_session, item, qty, price, tendered):
 
 
 def test_corrected_sale_replaces_items_and_settlement_in_place(configured_session, clock):
-    settle_cash(configured_session, "Mug", 1, Decimal("60"), Decimal("60"))
+    settle_cash(configured_session, "MUG", 1, Decimal("60"), Decimal("60"))
     clock.advance(minutes=5)
 
     configured_session.correct_sale(
@@ -39,7 +39,7 @@ def test_corrected_sale_replaces_items_and_settlement_in_place(configured_sessio
 
 
 def test_correction_keeps_sequence_number_and_creation_time(configured_session, clock):
-    settle_cash(configured_session, "Mug", 1, Decimal("60"), Decimal("60"))
+    settle_cash(configured_session, "MUG", 1, Decimal("60"), Decimal("60"))
     created = configured_session.get_sale(1).created_at
     clock.advance(minutes=10)
 
@@ -55,8 +55,8 @@ def test_correction_keeps_sequence_number_and_creation_time(configured_session, 
 
 
 def test_correction_updates_the_days_totals(configured_session):
-    settle_cash(configured_session, "Mug", 1, Decimal("60"), Decimal("60"))
-    settle_cash(configured_session, "Badge", 1, Decimal("15"), Decimal("15"))
+    settle_cash(configured_session, "MUG", 1, Decimal("60"), Decimal("60"))
+    settle_cash(configured_session, "BDG", 1, Decimal("15"), Decimal("15"))
     assert configured_session.running_summary().takings == Decimal("75")
 
     configured_session.correct_sale(
@@ -70,7 +70,7 @@ def test_correction_updates_the_days_totals(configured_session):
 
 
 def test_correction_rejects_wrong_tender_total(configured_session):
-    settle_cash(configured_session, "Mug", 1, Decimal("60"), Decimal("60"))
+    settle_cash(configured_session, "MUG", 1, Decimal("60"), Decimal("60"))
     with pytest.raises(PosError):
         configured_session.correct_sale(
             seq=1,
@@ -80,8 +80,8 @@ def test_correction_rejects_wrong_tender_total(configured_session):
 
 
 def test_voided_sale_removed_from_totals_but_kept(configured_session):
-    settle_cash(configured_session, "Mug", 1, Decimal("60"), Decimal("60"))
-    settle_cash(configured_session, "Badge", 1, Decimal("15"), Decimal("15"))
+    settle_cash(configured_session, "MUG", 1, Decimal("60"), Decimal("60"))
+    settle_cash(configured_session, "BDG", 1, Decimal("15"), Decimal("15"))
 
     configured_session.void_sale(1)
 
@@ -94,27 +94,27 @@ def test_voided_sale_removed_from_totals_but_kept(configured_session):
 
 
 def test_void_keeps_original_sequence_number(configured_session):
-    settle_cash(configured_session, "Mug", 1, Decimal("60"), Decimal("60"))
+    settle_cash(configured_session, "MUG", 1, Decimal("60"), Decimal("60"))
     configured_session.void_sale(1)
     assert configured_session.list_voids()[0].seq == 1
 
 
 def test_new_sale_after_void_gets_next_number(configured_session):
-    settle_cash(configured_session, "Mug", 1, Decimal("60"), Decimal("60"))
+    settle_cash(configured_session, "MUG", 1, Decimal("60"), Decimal("60"))
     configured_session.void_sale(1)
-    settle_cash(configured_session, "Badge", 1, Decimal("15"), Decimal("15"))
+    settle_cash(configured_session, "BDG", 1, Decimal("15"), Decimal("15"))
     assert configured_session.get_sale(2).status == "completed"
 
 
 def test_cannot_void_twice(configured_session):
-    settle_cash(configured_session, "Mug", 1, Decimal("60"), Decimal("60"))
+    settle_cash(configured_session, "MUG", 1, Decimal("60"), Decimal("60"))
     configured_session.void_sale(1)
     with pytest.raises(PosError):
         configured_session.void_sale(1)
 
 
 def test_cannot_correct_a_voided_sale(configured_session):
-    settle_cash(configured_session, "Mug", 1, Decimal("60"), Decimal("60"))
+    settle_cash(configured_session, "MUG", 1, Decimal("60"), Decimal("60"))
     configured_session.void_sale(1)
     with pytest.raises(PosError):
         configured_session.correct_sale(

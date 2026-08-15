@@ -16,14 +16,16 @@ from pathlib import Path
 
 from .domain import CatalogError, Item, money
 
-_STOCK_SHEET_HEADER = [
-    "itemid",
-    "itemname",
-    "price",
-    "inventory",
-    "sales",
-    "revenue",
+STOCK_SHEET_HEADER = [
+    "ItemID",
+    "ItemName",
+    "Price",
+    "Inventory",
+    "Sales",
+    "Revenue",
 ]
+
+_HEADER_LOWER = [cell.lower() for cell in STOCK_SHEET_HEADER]
 
 
 def load_catalog(path: str | Path) -> list[Item]:
@@ -38,7 +40,7 @@ def load_catalog(path: str | Path) -> list[Item]:
         raise CatalogError("Stock sheet CSV is empty")
 
     header = [cell.strip().lower() for cell in rows[0]]
-    if header != _STOCK_SHEET_HEADER:
+    if header != _HEADER_LOWER:
         raise CatalogError(
             "Stock sheet CSV must have a header row of "
             "ItemID, ItemName, Price, Inventory, Sales, Revenue"
@@ -82,5 +84,19 @@ def load_catalog(path: str | Path) -> list[Item]:
                 )
 
         name = cells[1]
-        items.append(Item(item_id=item_id, name=name, price=price, starting_quantity=quantity))
+        raw = (
+            row[0],
+            row[1],
+            row[2] if len(row) > 2 else "",
+            row[3] if len(row) > 3 else "",
+        )
+        items.append(
+            Item(
+                item_id=item_id,
+                name=name,
+                price=price,
+                starting_quantity=quantity,
+                raw_cells=raw,
+            )
+        )
     return items

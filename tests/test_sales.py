@@ -15,7 +15,7 @@ from pos.domain import CASH, InvalidSettlement, PosError, Tender
 
 
 def test_item_list_shows_live_remaining_counts(configured_session):
-    configured_session.add_item_to_sale("Mug", 2)
+    configured_session.add_item_to_sale("MUG", 2)
     configured_session.settle_current_sale(
         [Tender(CASH, Decimal("120"), tendered=Decimal("200"))]
     )
@@ -26,34 +26,34 @@ def test_item_list_shows_live_remaining_counts(configured_session):
 
 
 def test_add_item_builds_running_total(configured_session):
-    configured_session.add_item_to_sale("Mug", 1)
-    configured_session.add_item_to_sale("Badge", 2)
+    configured_session.add_item_to_sale("MUG", 1)
+    configured_session.add_item_to_sale("BDG", 2)
     assert configured_session.current_sale_total() == Decimal("90")
     items = configured_session.current_sale_items()
     assert [(i.item_name, i.quantity) for i in items] == [("Mug", 1), ("Badge", 2)]
 
 
 def test_adding_same_item_twice_accumulates_quantity(configured_session):
-    configured_session.add_item_to_sale("Mug", 1)
-    configured_session.add_item_to_sale("Mug", 3)
+    configured_session.add_item_to_sale("MUG", 1)
+    configured_session.add_item_to_sale("MUG", 3)
     assert configured_session.current_sale_total() == Decimal("240")
 
 
 def test_set_quantity_replaces_and_zero_removes(configured_session):
-    configured_session.add_item_to_sale("Mug", 1)
-    configured_session.set_sale_quantity("Mug", 2)
+    configured_session.add_item_to_sale("MUG", 1)
+    configured_session.set_sale_quantity("MUG", 2)
     assert configured_session.current_sale_total() == Decimal("120")
-    configured_session.set_sale_quantity("Mug", 0)
+    configured_session.set_sale_quantity("MUG", 0)
     assert configured_session.current_sale_total() == Decimal("0")
 
 
 def test_cannot_add_unknown_item(configured_session):
     with pytest.raises(PosError):
-        configured_session.add_item_to_sale("Ghost", 1)
+        configured_session.add_item_to_sale("GHOST", 1)
 
 
 def test_settle_cash_sale_computes_change(configured_session, clock):
-    configured_session.add_item_to_sale("Mug", 1)
+    configured_session.add_item_to_sale("MUG", 1)
     result = configured_session.settle_current_sale(
         [Tender(CASH, Decimal("60"), tendered=Decimal("100"))]
     )
@@ -65,12 +65,12 @@ def test_settle_cash_sale_computes_change(configured_session, clock):
 
 def test_settle_assigns_incrementing_sequence_and_timestamps(configured_session, clock):
     clock.advance(seconds=30)
-    configured_session.add_item_to_sale("Mug", 1)
+    configured_session.add_item_to_sale("MUG", 1)
     first = configured_session.settle_current_sale(
         [Tender(CASH, Decimal("60"), tendered=Decimal("60"))]
     )
     clock.advance(seconds=30)
-    configured_session.add_item_to_sale("Badge", 1)
+    configured_session.add_item_to_sale("BDG", 1)
     second = configured_session.settle_current_sale(
         [Tender(CASH, Decimal("15"), tendered=Decimal("20"))]
     )
@@ -84,7 +84,7 @@ def test_settle_assigns_incrementing_sequence_and_timestamps(configured_session,
 
 
 def test_settled_sale_is_recorded_and_clears_the_current_sale(configured_session):
-    configured_session.add_item_to_sale("Mug", 1)
+    configured_session.add_item_to_sale("MUG", 1)
     configured_session.settle_current_sale(
         [Tender(CASH, Decimal("60"), tendered=Decimal("60"))]
     )
@@ -106,7 +106,7 @@ def test_cannot_settle_an_empty_sale(configured_session):
 def test_cannot_settle_before_setup(session, catalog_file):
     session.set_device_name("Till A")
     session.load_catalog(catalog_file)
-    session.add_item_to_sale("Mug", 1)
+    session.add_item_to_sale("MUG", 1)
     with pytest.raises(PosError):
         session.settle_current_sale(
             [Tender(CASH, Decimal("60"), tendered=Decimal("60"))]

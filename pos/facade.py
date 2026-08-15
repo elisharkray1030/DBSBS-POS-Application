@@ -104,10 +104,10 @@ class PosSession:
     def _save_settings(self) -> None:
         self._persistence.save_settings(self._settings)
 
-    def _find_item(self, name: str) -> Item:
-        item = self._settings.item(name)
+    def _find_item(self, item_id: str) -> Item:
+        item = self._settings.item_by_id(item_id)
         if item is None:
-            raise ItemNotFound(f"No item named {name!r} in the catalog")
+            raise ItemNotFound(f"No item with ID {item_id!r} in the catalog")
         return item
 
     def _require_configured(self) -> None:
@@ -173,16 +173,16 @@ class PosSession:
             )
         return stocks
 
-    def mark_sold_out(self, name: str) -> None:
-        self._find_item(name).sold_out = True
+    def mark_sold_out(self, item_id: str) -> None:
+        self._find_item(item_id).sold_out = True
         self._save_settings()
 
-    def unmark_sold_out(self, name: str) -> None:
-        self._find_item(name).sold_out = False
+    def unmark_sold_out(self, item_id: str) -> None:
+        self._find_item(item_id).sold_out = False
         self._save_settings()
 
-    def is_sold_out(self, name: str) -> bool:
-        return self._find_item(name).sold_out
+    def is_sold_out(self, item_id: str) -> bool:
+        return self._find_item(item_id).sold_out
 
     # -- building the current sale ------------------------------------------
 
@@ -195,39 +195,39 @@ class PosSession:
     def current_sale_total(self) -> Decimal:
         return sum((line.total for line in self._current_items), Decimal("0"))
 
-    def add_item_to_sale(self, name: str, quantity: int) -> None:
+    def add_item_to_sale(self, item_id: str, quantity: int) -> None:
         quantity = int(quantity)
         if quantity <= 0:
             raise PosError("Quantity must be a positive whole number")
-        item = self._find_item(name)
+        item = self._find_item(item_id)
         if item.sold_out:
-            raise ItemSoldOut(f"{name!r} is sold out")
+            raise ItemSoldOut(f"{item.name!r} is sold out")
         for line in self._current_items:
-            if line.item_name == name:
+            if line.item_id == item_id:
                 line.quantity += quantity
                 return
         self._current_items.append(
-            LineItem(item_id=item.item_id, item_name=name, quantity=quantity, price=item.price)
+            LineItem(item_id=item.item_id, item_name=item.name, quantity=quantity, price=item.price)
         )
 
-    def set_sale_quantity(self, name: str, quantity: int) -> None:
+    def set_sale_quantity(self, item_id: str, quantity: int) -> None:
         quantity = int(quantity)
         if quantity < 0:
             raise PosError("Quantity cannot be negative")
         if quantity == 0:
             self._current_items = [
-                line for line in self._current_items if line.item_name != name
+                line for line in self._current_items if line.item_id != item_id
             ]
             return
-        item = self._find_item(name)
+        item = self._find_item(item_id)
         if item.sold_out:
-            raise ItemSoldOut(f"{name!r} is sold out")
+            raise ItemSoldOut(f"{item.name!r} is sold out")
         for line in self._current_items:
-            if line.item_name == name:
+            if line.item_id == item_id:
                 line.quantity = quantity
                 return
         self._current_items.append(
-            LineItem(item_id=item.item_id, item_name=name, quantity=quantity, price=item.price)
+            LineItem(item_id=item.item_id, item_name=item.name, quantity=quantity, price=item.price)
         )
 
     # -- settling -----------------------------------------------------------
@@ -348,12 +348,10 @@ class PosSession:
         cash = sum((s.tender_sum(CASH) for s in completed), Decimal("0"))
         octopus = sum((s.tender_sum(OCTOPUS) for s in completed), Decimal("0"))
         voucher = sum((s.tender_sum(VOUCHER) for s in completed), Decimal("0"))
-        name_by_id = {item.item_id: item.name for item in self._settings.catalog}
         sold_counts: dict[str, int] = {}
         for item_id, (units, _revenue) in self._sold_and_revenue_by_item().items():
             if units:
-                name = name_by_id.get(item_id, item_id)
-                sold_counts[name] = sold_counts.get(name, 0) + units
+                sold_counts[item_id] = sold_counts.get(item_id, 0) + units
         adjustments = self._persistence.get_cash_adjustments()
         adjustment_sum = sum((a.amount for a in adjustments), Decimal("0"))
         voids = self.list_voids()
@@ -430,27 +428,20 @@ class PosSession:
 
         with open(report_path, "w", newline="", encoding="utf-8") as handle:
             writer = csv.writer(handle)
-            writer.writerow(
-                ["ItemID", "ItemName", "Price", "Inventory", "Sales", "Revenue"]
-            )
+            writer.writerow(catalog_module.STOCK_SHEET_HEADER)
             sold = self._sold_and_revenue_by_item()
             for item in self._settings.catalog:
                 units, revenue = sold.get(item.item_id, (0, Decimal("0")))
-                inventory = (
-                    str(item.starting_quantity)
-                    if item.starting_quantity is not None
-                    else ""
-                )
-                writer.writerow(
-                    [
-                        item.item_id,
-                        item.name,
-                        str(item.price),
-                        inventory,
-                        str(units),
-                        str(revenue),
-                    ]
-                )
+                if item.raw_cells is not None:
+                    passthrough = list(item.raw_cells)
+                else:
+                    inventory = (
+                        str(item.starting_quantity)
+                        if item.starting_quantity is not None
+                        else ""
+                    )
+                    passthrough = [item.item_id, item.name, str(item.price), inventory]
+                writer.writerow(passthrough + [str(units), str(revenue)])
 
         self._settings.last_export_at = self._now()
         self._save_settings()

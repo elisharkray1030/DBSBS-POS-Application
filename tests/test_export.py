@@ -19,8 +19,8 @@ def read_rows(path):
         return list(csv.reader(handle))
 
 
-def test_export_writes_both_files_with_headers(configured_session, tmp_path):
-    configured_session.add_item_to_sale("Mug", 1)
+def test_export_writes_all_files_with_headers(configured_session, tmp_path):
+    configured_session.add_item_to_sale("MUG", 1)
     configured_session.settle_current_sale([Tender(CASH, Decimal("60"), tendered=Decimal("60"))])
     paths = configured_session.export_csv(tmp_path / "export")
 
@@ -39,9 +39,9 @@ def test_export_writes_both_files_with_headers(configured_session, tmp_path):
 
 
 def test_sales_export_has_one_row_per_sale_with_all_fields(configured_session, tmp_path):
-    configured_session.add_item_to_sale("Mug", 1)
+    configured_session.add_item_to_sale("MUG", 1)
     configured_session.settle_current_sale([Tender(CASH, Decimal("60"), tendered=Decimal("60"))])
-    configured_session.add_item_to_sale("Badge", 2)
+    configured_session.add_item_to_sale("BDG", 2)
     configured_session.settle_current_sale([Tender(OCTOPUS, Decimal("30"))])
 
     rows = read_rows(configured_session.export_csv(tmp_path)[0])
@@ -60,8 +60,8 @@ def test_sales_export_has_one_row_per_sale_with_all_fields(configured_session, t
 
 
 def test_items_export_has_one_row_per_line_item(configured_session, tmp_path):
-    configured_session.add_item_to_sale("Mug", 2)
-    configured_session.add_item_to_sale("Badge", 3)
+    configured_session.add_item_to_sale("MUG", 2)
+    configured_session.add_item_to_sale("BDG", 3)
     configured_session.settle_current_sale([Tender(CASH, Decimal("165"), tendered=Decimal("165"))])
 
     rows = read_rows(configured_session.export_csv(tmp_path)[1])
@@ -71,7 +71,7 @@ def test_items_export_has_one_row_per_line_item(configured_session, tmp_path):
 
 
 def test_voided_sales_appear_with_voided_status(configured_session, tmp_path):
-    configured_session.add_item_to_sale("Mug", 1)
+    configured_session.add_item_to_sale("MUG", 1)
     configured_session.settle_current_sale([Tender(CASH, Decimal("60"), tendered=Decimal("60"))])
     configured_session.void_sale(1)
 
@@ -88,7 +88,7 @@ def test_voided_sales_appear_with_voided_status(configured_session, tmp_path):
 def test_corrected_sales_export_final_state_with_original_creation_time(
     configured_session, tmp_path, clock
 ):
-    configured_session.add_item_to_sale("Mug", 1)
+    configured_session.add_item_to_sale("MUG", 1)
     configured_session.settle_current_sale([Tender(CASH, Decimal("60"), tendered=Decimal("60"))])
     created = configured_session.get_sale(1).created_at.isoformat()
     clock.advance(minutes=20)
