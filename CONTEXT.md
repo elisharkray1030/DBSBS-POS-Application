@@ -16,6 +16,10 @@ _Avoid_: Register, booth
 A physical DBS boarding-school-themed object sold over the counter at a fixed price.
 _Avoid_: Product, merchandise
 
+**Item ID**:
+The stable identifier an item carries from the organizer's Stock sheet (`ItemID` column). The app's canonical identity for an item — unique within the sheet, never assigned in-app, and written back unchanged on the Stock sheet report. Shown alongside the item name in the item list.
+_Avoid_: SKU, code
+
 **Sale**:
 A single customer's purchase at the stall, made up of one or more items.
 _Avoid_: Transaction, purchase
@@ -37,8 +41,12 @@ The hand-written order sheet given to the customer at the point of sale. Written
 _Avoid_: Order sheet, slip
 
 **Catalog**:
-The full list of items and their fixed prices, delivered as a CSV file that is loaded into the app before the event.
-_Avoid_: Menu, stock list, product list
+The full list of items and their fixed prices, loaded into the app before the event from the organizer's Stock sheet CSV. Fully read-only during the event — the app never adds or edits items in-app.
+_Avoid_: Menu, product list
+
+**Stock sheet**:
+The organizer's master CSV listing every item, with columns `ItemID, ItemName, Price, Inventory, Sales, Revenue`. Loaded into the app as the catalog before the event; at the end of the day each device writes out a new report file with the same columns, filling only its own Sales and Revenue (the source file is left untouched), and the organizer combines the two devices' reports by hand.
+_Avoid_: Stocks file, stock list
 
 **Device**:
 One of the two Windows laptops the stall operates on event day. Each device is used by a single cashier at a time and has its own copy of the catalog. The devices have no network between them.
@@ -57,7 +65,7 @@ Removing a sale from the record entirely, as though it never happened. Voids do 
 _Avoid_: Cancel, delete, refund
 
 **Starting quantity**:
-The count of an item the stall began the event with, taken from the catalog CSV. The basis for the end-of-event stock check.
+The count of an item the stall began the event with, taken from the Inventory column of the Stock sheet. The basis for the end-of-event stock check.
 _Avoid_: Stock level, inventory
 
 **Expected cash**:
