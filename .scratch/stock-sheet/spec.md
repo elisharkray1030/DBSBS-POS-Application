@@ -1,7 +1,7 @@
 # Spec: Stock sheet round-trip
 
 > Feature spec, published by `/to-spec` after the grilling session of 2026-08-15.
-> **Status: ready-for-agent**
+> **Status: done**
 >
 > Amends `.scratch/dbsbs-pos/spec.md`: this spec replaces the catalog input
 > format (`Name, Price, Quantity` → the Stock sheet), makes the catalog
