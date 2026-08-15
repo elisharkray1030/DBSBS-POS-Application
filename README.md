@@ -30,8 +30,8 @@ Alternatively run `python main.pyw` from a terminal.
 - Cash and vouchers may be split across one sale in any combination.
 - Octopus always settles the full sale on its own; partial or combined Octopus
   is rejected.
-- Voucher denomination and change policy are TBC (`docs/open-questions.md`),
-  so vouchers currently give no change — placeholder behavior.
+- A voucher spends in full with no change given; the app records the sale
+  value covered by vouchers and shows the total voucher value per device.
 
 ## Development
 

@@ -1,13 +1,24 @@
-# Open Questions
+# Open Questions — resolved
 
-Decisions not yet confirmed. Items here block downstream design; resolve them with the stall's organizer before implementation.
+All previously-open decisions were resolved with the stall's organizer on
+2026-08-15. They are recorded here for history; the canonical spec
+(`.scratch/dbsbs-pos/spec.md`) carries the final policy.
 
 ## Vouchers
 
-- **Q: Denomination & change** — What value(s) do vouchers come in? If a sale totals less than a voucher's value, does the stall give change, allow the voucher to cover multiple sales, or spend it in full with no change?
-- **Q: End-of-day handling** — What happens to collected vouchers at the end of the event? Are they counted/handed back to the organizer? Does the app need to track how many vouchers were collected?
+- **Q: Denomination & change** — **Resolved:** a voucher spends in full with no
+  change given. If a voucher's value exceeds the sale total, the stall keeps
+  the difference. The app records the sale value covered by vouchers, not the
+  voucher's face value. (The placeholder behavior shipped in the voucher
+  tender is final.)
+- **Q: End-of-day handling** — **Resolved:** the app tracks total voucher
+  value received per device; the organizer physically counts the paper
+  vouchers. No per-denomination tracking.
 
 ## CSV catalog
 
-- **Q: Offline transfer to 2 devices** — There are two devices and no wifi. How does the CSV (and any per-device config) get onto both? (Copy the same file to both / load on one and export to the other / shared drive.)
-- **Q: Format details** — Confirmed as `Name, Price, Quantity`. Confirm the delimiter (comma vs tab) and whether quantities for all items are present, or some items have no quantity (sell-by-demand).
+- **Q: Offline transfer to 2 devices** — **Resolved:** the organizer copies the
+  same `Name, Price, Quantity` CSV to both laptops before the event (USB stick
+  / shared drive). No on-the-day transfer.
+- **Q: Format details** — **Resolved:** comma-delimited with a header row;
+  items without a quantity (sell-by-demand) are allowed with a blank quantity.
