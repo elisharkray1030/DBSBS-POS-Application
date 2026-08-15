@@ -1,5 +1,10 @@
+# Python caches
 __pycache__/
 *.pyc
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime device data (created next to main.pyw)
 pos.db
 *.db
