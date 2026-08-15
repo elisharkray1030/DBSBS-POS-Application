@@ -1,20 +1,20 @@
 # DBS Garden Fete — Offline POS Application Plan
 
-**Team:** 3 people · **Venue:** DBS Garden Fete (1 stall) · **Devices:** 2 laptops at the stall · **Payments:** cash + Octopus · **Deadline:** 2026-10-31 · **Constraint:** $0/mo, fully offline · **Status:** Decision-ready, pending open questions in §8
+**Team:** 3 people · **Venue:** DBS Garden Fete (1 stall) · **Devices:** 2 laptops (1 stall, same catalog) · **Payments:** cash + Octopus — but money is handled separately, outside the app · **Deadline:** 2026-10-31 · **Constraint:** $0/mo, fully offline, venue may have NO Wi-Fi · **Status:** Decision-ready — Q1/Q2/Q3/Q5/Q7 resolved; pending CSV sample (Q4) and hotspot check (Q6)
 
 ---
 
 ## Executive Summary
 
-1. **Verdict:** build a small local web app — Flask + SQLite, run on a laptop, second laptop joins over local Wi-Fi. Do NOT buy a cloud POS. The offline constraint alone disqualifies every online POS (Square, Shopify, iCHEF), and the CSV catalog + Octopus recording + $0 rule rule out the offline-capable commercial ones.
-2. **Why offline-first:** the fete venue can't be relied on for internet. The app must run with zero connectivity — all assets bundled locally, no CDNs, no accounts, no cloud calls anywhere in the happy path.
-3. **Core loop:** import the catalog from CSV once → sell all day on 2 laptops against shared state → close the day: summary + CSV export for the team's records.
-4. **Stack:** Flask + SQLite + vanilla browser UI (no build step). Python is already the team's proven toolkit — the Lateness app is the same shape (Flask + SQLite + CSV). No Docker needed at the venue; bare `python app.py`.
-5. **Cost:** $0. Runs on hardware the team already brings. No hosting, no subscriptions, no per-transaction fees.
-6. **Effort:** MVP ~20–24h · v1 ~+6–10h · total ~26–34h. Deadline is 2026-10-31 — about 10 weeks at ~3–4h/week. Comfortable, with a full rehearsal before the fete.
-7. **Octopus is recorded, not integrated:** the Octopus card reader is standalone hardware that takes payment itself; the app only records "Octopus $X" as the payment method. No SDK, no merchant integration. (Confirm the reader exists — Q3.)
-8. **De-risk first:** confirm the open questions (§8), get a real sample catalog CSV, and run a one-hour dry rehearsal with both laptops before writing polish features.
-9. **Confidence: 0.85.** The build is small and the pattern is already proven in this team. Remaining variance: second-device form factor (Q1), Octopus hardware (Q3), venue network (Q6).
+1. **Verdict:** build a small local web app — Flask + SQLite, run on **one laptop**. The second laptop is a browser client that joins over a hotspot **only if the venue allows one** (v1, not MVP). The MVP must run with zero network at all.
+2. **What it actually is:** a **stock-and-price notebook with a fast sale logger**. The app notes catalog, prices, and stock; records every sale with time, items, and payment method as an in-system log. **The money itself is counted separately by the team** — the app never reconciles a drawer or touches Octopus/cash handling.
+3. **Core loop:** import the catalog CSV once → sell all day against one local database → at close, one button gives per-item sold counts, totals by payment method (informational), and a CSV export of the day.
+4. **Stack:** Flask + SQLite + vanilla browser UI (no build step). Python is the team's proven toolkit (Lateness app is the same shape). No Docker, no hosting, no accounts. Bare `python app.py`.
+5. **Cost:** $0. Runs on hardware the team already brings. No cloud, no subscriptions, no per-transaction fees — and nothing to break when the venue has no internet.
+6. **Effort:** MVP ~16–20h · v1 ~+6–8h · total ~22–28h. Deadline 2026-10-31 ≈ 10 weeks at ~3h/week. Comfortable, with a rehearsal before the fete.
+7. **Receipts:** not required. The sale log **is** the receipt book — every sale viewable in the system, filterable by time/items/method. Optional browser-print stays in v2 if anyone ever wants paper.
+8. **De-risk first:** get a real sample catalog CSV when the team has one (contract stays provisional until then), and check whether a laptop hotspot works at the venue (decides if LAN mode ever ships).
+9. **Confidence: 0.9.** Scope is now small and unambiguous. Remaining variance: CSV format details (Q4) and hotspot feasibility (Q6) — each moves it ±0.05.
 
 ---
 
@@ -24,53 +24,54 @@
 
 | Need | Spreadsheet | Commercial POS | Custom local app (this plan) |
 |---|---|---|---|
-| Works with zero internet | ✅ | ⚠️ offline-capable ones need accounts/setup; online ones dead | ✅ by design |
-| CSV catalog import | ✅ | ⚠️ manual data entry or paid import | ✅ native |
-| Cash + Octopus recording | ⚠️ manual | ⚠️ Octopus needs merchant integration, usually paid | ✅ record method + amount |
-| 2 devices, shared live state | ❌ two copies, merge by hand | ✅ (but online) | ✅ LAN shared DB |
-| End-of-day totals + cash reconciliation | ⚠️ hand formulas | ✅ | ✅ built-in |
-| Cost | $0 | paid monthly + per-terminal fees | $0 |
+| Works with zero internet | ✅ | ⚠️ offline ones need accounts/setup; online ones dead | ✅ by design |
+| CSV catalog import | ⚠️ manual | ⚠️ data entry or paid import | ✅ native |
+| Record sales with method (cash/Octopus) | ⚠️ manual | ✅ (but tied to payment integrations) | ✅ as a log field — money handled separately |
+| Live shared state across 2 laptops | ❌ two copies, merge by hand | ✅ (but online) | ✅ LAN mode (v1, hotspot-gated) |
+| End-of-day totals + per-item counts | ⚠️ hand formulas | ✅ | ✅ built-in |
+| Cost | $0 | paid monthly + terminal fees | $0 |
 | Team already knows the stack | — | — | ✅ (Lateness app pattern) |
 
-**Verdict:** a tiny build genuinely beats configuration here. The requirements (offline, CSV, cash + Octopus, $0) form a corner no free product sits in. The build is small enough that the effort is mostly the sell-screen UI, not plumbing.
+**Verdict:** a tiny build still beats configuration — the corner (offline, CSV, $0, money handled outside) has no commercial product in it, and the build is mostly the sell-screen UI. Note the deliberate simplification: because money is handled separately, we are NOT building payment capture, reconciliation, or Octopus integration at all.
 
 **Anti-patterns rejected:**
-- No cloud POS / SaaS of any kind — the venue has no guaranteed internet.
-- No desktop app (Tauri/Electron/installer) — a browser UI on localhost/LAN has zero install friction; both laptops already have browsers.
-- No PWA/service-worker sync — that's the *online* fallback, backwards for us. Offline-first means the server IS local.
-- No Octopus SDK integration — merchant-grade integration needs an account, a terminal, and connectivity. Out of scope by definition.
+- No cloud POS / SaaS of any kind — venue has no guaranteed internet.
+- No payment/reconciliation features — the team counts money separately; the app logs, it doesn't balance.
+- No desktop app (Tauri/Electron/installer) — a browser UI on localhost has zero install friction.
+- No PWA/service-worker sync — backwards for us. Offline-first means the server IS local.
+- No multi-device sync in MVP — one laptop is the default; the second joins only if a hotspot works.
 
 ### 1.2 MVP scope
 
-The MVP is a **shared, offline sale-recording app on one stall's Wi-Fi**:
+The MVP is a **single-laptop, zero-network sale logger**:
 
 1. `Catalog in from CSV` — import a CSV (name, price, stock, category) with validation; errors reported per line, nothing half-imported.
-2. `Sell fast` — big-button catalog grid, tap to add to cart, cart shows running total, choose **cash** or **Octopus**, complete. Sub-5-second sale.
+2. `Sell fast` — big-button catalog grid, tap to add to cart, running total, choose **cash** or **Octopus** (informational), complete. Sub-5-second sale.
 3. `Stock that stays honest` — stock decrements on every sale; "0 left" warning; restock by editing or re-importing.
-4. `Two laptops, one truth` — laptop A hosts the app; laptop B opens a browser to A's address on the same Wi-Fi. Both see the same catalog and sales live.
-5. `Close the day` — end-of-day summary: revenue by payment method, per-item quantities, stock deltas, cash reconciliation sheet, CSV export for records.
-6. `Survives no internet` — every asset bundled locally; the app runs identically with Wi-Fi off except the second laptop loses its connection (fallback in v1).
+4. `The receipt book` — every sale is logged in-system: time, items, quantities, unit prices, total, payment method. Filterable, never deleted.
+5. `Close the day` — summary: revenue by payment method, per-item quantities, stock deltas, plus a CSV export of the whole day. Informational — the team's money count happens separately.
+6. `Survives no internet` — every asset bundled locally; Wi-Fi off, hotspot off, router dead — the app never notices.
 
 ### 1.3 User stories (MVP)
 
-- As a stall operator, I want to import the team's catalog CSV once so I never type prices at the fete — import with errors reported per line.
+- As a stall operator, I want to import the team's catalog CSV once so I never type prices at the fete — errors reported per line.
 - As a stall operator, I want to complete a sale in under 5 seconds with a big-button grid, so queues don't build — pick items, total, pick cash/Octopus, done.
 - As a stall operator, I want stock to decrement automatically and warn me at zero, so I never sell what we don't have.
-- As the second operator on the same stall, I want my laptop to see the same catalog and sales as the first, so we're never double-counting.
-- As the team lead, I want an end-of-day summary: cash vs Octopus totals, per-item sales, and a reconciliation sheet, so the float matches the drawer.
+- As the team lead, I want every sale recorded in the system — time, items, method — so the log is our receipt book and disputes resolve in seconds.
+- As the team lead, I want an end-of-day summary: per-item sold counts, cash vs Octopus split, stock deltas — so the (separate) money count has a checklist to compare against.
 - As the team lead, I want the day's sales exported to CSV, so records land in the team's usual format.
-- As anyone at the stall, I want the app to work even if the venue has no internet — it must never depend on the cloud.
+- As anyone at the stall, I want the app to work with no internet at all — it must never depend on the cloud, the venue, or anything external.
 
-### 1.4 Explicit assumptions (each maps to an open question)
+### 1.4 Explicit assumptions
 
-- **A1:** The two devices are **laptops** (Q1 — form factor of device 2; tablets just mean bigger touch targets).
-- **A2:** **One stall**, one point of sale, two operators. Both laptops face the same customers.
-- **A3:** Catalog = CSV with at least: name, price, stock (Q4 — exact columns from a real sample file).
-- **A4:** **Octopus = standalone reader** the team already has; the app records the payment method and amount only (Q3).
-- **A5:** The fete is a **single day** (Q7). The data model keeps a date on every sale anyway, so multi-day costs nothing later.
-- **A6:** Receipts are **not required** in MVP (Q2). Cash sales get no receipt unless a printer is decided.
-- **A7:** A sale, once completed, stands. Void/refund is v1 (Q5).
-- **A8:** Prices are HKD with up to 2 decimals; the UI shows `$X.XX`.
+- **A1 ✅ RESOLVED — both devices are laptops.** Same form factor; no touch-target special-casing needed.
+- **A2:** One stall, one catalog. **MVP runs on one laptop**; the second laptop joins via browser over a hotspot only if the venue allows one (Q6) — v1, not MVP.
+- **A3 (provisional):** Catalog = CSV with at least name, price, stock, category. Contract stays provisional until the real sample arrives (Q4).
+- **A4 ✅ RESOLVED — money is handled separately.** The app records the payment method as a log field for stats; it does not capture, reconcile, or integrate payments.
+- **A5 ✅ RESOLVED — the fete is one day.** A `day` column on every sale keeps multi-day free anyway.
+- **A6 ✅ RESOLVED — no printed receipts.** The in-system sale log is the receipt book. Browser-print is optional v2.
+- **A7 (default):** A sale, once completed, stands. Void/refund is v1 and only if the team wants it (Q5 — default no).
+- **A8:** Prices are HKD with up to 2 decimals; the UI shows `$X.XX`; stored as integer cents.
 
 ---
 
@@ -80,36 +81,36 @@ The MVP is a **shared, offline sale-recording app on one stall's Wi-Fi**:
 
 | Option | Cost | Offline? | Friction removed? | Verdict |
 |---|---|---|---|---|
-| **Local Flask app (picked)** | $0 | ✅ native | Shared live state, CSV import, day close | ✅ **Recommend** |
-| Spreadsheet + hand-entry | $0 | ✅ | None — the pain is the math and the merge | Fallback if build fails |
-| Offline-capable commercial POS | paid | ⚠️ | Setup/account/terminal fees; Octopus integration usually extra | Rejected (cost + fit) |
+| **Local Flask app (picked)** | $0 | ✅ native | CSV import, fast sales, built-in log + day close | ✅ **Recommend** |
+| Spreadsheet + hand-entry | $0 | ✅ | None — the pain is the math and the manual log | Fallback if build fails |
+| Offline-capable commercial POS | paid | ⚠️ | Setup/account/terminal fees; payment features we don't need | Rejected (cost + fit) |
 | Cloud POS (Square/iCHEF) | paid | ❌ | — | Rejected (needs internet) |
 | Desktop app (Electron/Tauri) | $0 | ✅ | None over browser UI; adds install friction | Overkill |
 
 ### 2.2 Core loop (the whole product in one sentence)
 
-> Once: import the catalog CSV. All day: two laptops sell against one shared database. At close: one button prints the day's numbers and exports the CSV.
+> Once: import the catalog CSV. All day: sell against one local database — the second laptop joins only if a hotspot works. At close: one button shows per-item counts, the cash/Octopus split, and exports the day's CSV.
 
-### 2.3 Receipts — where they stand
+### 2.3 Receipts — resolved
 
-- MVP: **no receipts**. Most fete stalls don't issue them; the screen confirms the sale.
-- v1 (optional): browser-print a simple receipt (works on any printer the venue has — thermal 80mm via the browser's print-to-size, or plain A4). Decide at Q2.
+- **No printing.** The sale log screen is the receipt book: every sale with time, items, unit prices, total, and method; filterable; nothing ever deleted.
+- Optional browser-print of a sale (any printer) is parked in v2 — only if the team asks for paper.
 
 ---
 
-## 3. Software Stack (all free, nothing to verify — it's local)
+## 3. Software Stack (all free, all local — nothing to verify)
 
 | Layer | Choice | Why |
 |---|---|---|
 | Web framework | **Flask** | Proven in this team (Lateness app). Tiny, no magic. |
-| Database | **SQLite** (WAL mode) | Zero-ops single file; plenty for a stall's transaction volume. |
+| Database | **SQLite** (WAL mode) | Zero-ops single file; plenty for a stall's volume. |
 | Frontend | **Vanilla HTML/CSS/JS**, bundled locally | No build step, no CDN — works with Wi-Fi fully off. |
 | CSV | Python `csv` stdlib | Import catalog, export day's sales. |
-| Serving | Laptop A hosts on `0.0.0.0:5000`; laptop B opens `http://<A's-IP>:5000` | No install on B beyond a browser. |
-| Python env | System Python or the repo's venv on A only | B never needs Python. |
-| Docker | Optional, not required | The Lateness app has a compose.yaml; here bare python is simpler at a venue. |
+| Serving | Laptop A hosts on `127.0.0.1:5000` (MVP) · `0.0.0.0:5000` when LAN mode is on (v1) | Second laptop never needs Python — just a browser. |
+| Python env | System Python or the repo's venv on the host laptop only | — |
+| Docker | Optional, not required | Bare `python app.py` is simpler at a venue. |
 
-**Rejected:** anything requiring an account, a cloud, or connectivity (Supabase, Vercel, workers, managed DBs — all online by nature). Local-first is the whole point.
+**Rejected:** anything requiring an account, a cloud, or connectivity (Supabase, Vercel, Workers, managed DBs — all online by nature). Local-first is the whole point.
 
 ---
 
@@ -118,15 +119,17 @@ The MVP is a **shared, offline sale-recording app on one stall's Wi-Fi**:
 ### 4.1 Diagram
 
 ```
-Laptop A (host — the only thing running Python)
-  Flask app + SQLite (catalog, sales, stock)
-  binds 0.0.0.0:5000
-        │  local Wi-Fi (no internet needed)
-        ▼
-Laptop B (browser only)
-  opens http://<A's-IP>:5000 — same catalog, same sales
+MVP — zero network needed:
+  Laptop A (host)
+    Flask app + SQLite (catalog, sales, stock)  →   browser UI on localhost:5000
+    binds 127.0.0.1:5000 — no Wi-Fi, no router, no internet required
 
-Day close (on A): summary screen → CSV export → done
+v1 LAN mode (only if the venue allows a hotspot):
+  Laptop A (host)  ── local hotspot / Wi-Fi ──►  Laptop B (browser only)
+    binds 0.0.0.0:5000                            opens http://<A's-IP>:5000
+    same catalog, same sales, live
+
+Day close (on the host): summary screen (per-item, per-method) → CSV export → done
 ```
 
 ### 4.2 Data model (SQLite)
@@ -141,13 +144,13 @@ CREATE TABLE products (            -- imported from CSV; restock = edit or re-im
   active      INTEGER NOT NULL DEFAULT 1
 );
 
-CREATE TABLE sales (               -- one row per completed sale
+CREATE TABLE sales (               -- the receipt book — one row per completed sale
   id          INTEGER PRIMARY KEY,
   day         TEXT NOT NULL,       -- 'YYYY-MM-DD' local date
   ts          TEXT NOT NULL,       -- ISO local time
-  method      TEXT NOT NULL,       -- 'cash' | 'octopus'
+  method      TEXT NOT NULL,       -- 'cash' | 'octopus' — informational only
   total_cents INTEGER NOT NULL,
-  device      TEXT NOT NULL        -- 'A' | 'B' — which laptop took it
+  device      TEXT NOT NULL DEFAULT 'A'   -- which laptop took it (v1 LAN mode)
 );
 
 CREATE TABLE line_items (
@@ -164,10 +167,11 @@ CREATE INDEX idx_sales_day ON sales(day);
 Design notes:
 - **Prices as integer cents** — no floating-point money, ever.
 - **Unit price snapshotted** on the line item — a later price change never rewrites history.
-- **Stock is derived from reality, not math**: decrement on sale; stock column is the live count. Low-stock = warning at 0, not a hard block (staff can restock mid-day).
+- **Stock is live**: decrement on sale; warning at 0, not a hard block (staff can restock mid-day).
 - A `day` column on every sale keeps the model multi-day-ready even though the fete is one day (A5).
+- **No payment tables, no reconciliation tables** — money is handled separately (A4). `method` is a label, not a ledger.
 
-### 4.3 Catalog CSV contract (proposed — pending the real sample, Q4)
+### 4.3 Catalog CSV contract (provisional — pending the real sample, Q4)
 
 ```csv
 name,price,stock,category
@@ -189,52 +193,54 @@ Chocolate Milk,12,40,Drinks
 1. Catalog grid: category filter tabs + big item buttons showing name and price; stock shown, zero-stock items greyed with "0 left".
 2. Tap items → cart on the right: qty steppers, running total.
 3. **Pay**: one tap for Cash, one for Octopus → sale recorded, stock decremented, cart clears. Done in one screen — no confirm dialogs.
-4. Both laptops see the new stock/total immediately (single DB, WAL mode).
+
+**Sale log** (the receipt book)
+- Table of every sale: time, items (with qty × unit price), total, method. Filters by day and method; nothing is ever deleted.
 
 **Close the day** (at the end)
 1. "Close day" → summary: revenue cash / revenue octopus / total; per-item quantities; stock deltas (sold per item).
-2. Cash reconciliation sheet: expected cash drawer (opening float + cash sales) vs counted — the team fills in the count, the app shows the difference.
-3. Export: `sales-YYYY-MM-DD.csv` (per sale: time, items, method, total) + the summary printed on screen.
+2. These are **informational** — the team's money count happens separately (A4). The summary doubles as a checklist for that count.
+3. Export: `sales-YYYY-MM-DD.csv` (per sale: time, items, method, total) + the summary on screen.
 
-**Void / refund** (v1)
-- Last-sale undo within a day: flags the sale as voided (kept in the log, excluded from totals), stock restored, difference shown on the day summary.
+**Void / refund** (v1, only if wanted — Q5, default no)
+- Last-sale undo within a day: flags the sale as voided (kept in the log, excluded from totals), stock restored.
 
 ### 4.5 Concurrency & the LAN edge
 
-- SQLite in WAL mode with short transactions is plenty for a stall (a handful of transactions per minute). A "sale complete" is one transaction.
-- If laptop B loses the Wi-Fi mid-day (Q6): **v1 fallback** — B runs a standalone instance against its own local DB, keeps selling, and at close exports its CSV which A merges (same import path, `sales` tagged with device). MVP just notes it in the error state and keeps A's data authoritative.
+- **MVP: no concurrency.** One laptop, one process, one browser. SQLite WAL is still on for crash-safety.
+- **v1 LAN mode:** if the venue allows a hotspot, laptop B is a browser client on the same DB — WAL + short transactions handles a stall's few-transactions-per-minute easily. Per-sale `device` tag keeps the log truthful.
+- If LAN mode is never used (no hotspot), nothing is lost — the MVP is complete without it.
 
 ---
 
 ## 5. Roadmap
 
 ### Phase 0 — Validate before building (1–2h, this week)
-- Answer the open questions in §8 with the team (Q1–Q7).
-- Get a **real sample catalog CSV** — the exact file the team would bring (Q4). It defines the import contract.
-- Decide receipts (Q2) and confirm the Octopus reader (Q3).
+- Get a **real sample catalog CSV** when the team has one (Q4) — it locks the import contract.
+- Check whether a **laptop hotspot is allowed at the venue** (Q6) — decides whether LAN mode ever ships.
+- Confirm void/refund isn't needed at the fete (Q5 — default: not needed).
 
-### Phase 1 — MVP (~20–24h)
-Scope: CSV import with validation · sell screen (grid, cart, cash/Octopus) · stock decrement + zero warnings · SQLite schema above · single-laptop offline mode · LAN mode (laptop B via browser) · day close (summary, reconciliation sheet, CSV export) · bundled local assets (zero internet).
+### Phase 1 — MVP (~16–20h)
+Scope: CSV import with validation · sell screen (grid, cart, cash/Octopus) · stock decrement + zero warnings · sale log screen (the receipt book) · SQLite schema above · single-laptop offline mode (binds localhost only) · day close (summary, per-method totals, CSV export) · bundled local assets (zero internet).
 Acceptance:
 - A 50-item catalog imports in one step with per-line errors; re-import updates cleanly.
 - A sale (3 items, cash) completes in under 5 seconds from item tap to total.
 - Stock matches hand-count after 20 mixed test sales; zero-stock items can't be added to cart.
-- Laptop B on the same Wi-Fi sees every sale from A and can sell simultaneously; totals reconcile.
-- With Wi-Fi fully off, laptop A sells normally end-to-end.
+- Every sale appears in the log with items, unit prices, method, and time; the log survives an app restart.
 - Day close totals match a hand count; CSV export opens cleanly in Excel.
-- No internet is touched at any point (verify: no CDN requests in devtools).
+- **Wi-Fi fully off, no network adapters, no router** — the app sells end-to-end. Verify: no CDN requests in devtools, `localhost` only.
 
-### Phase 2 — v1 (+6–10h)
-Scope: B standalone fallback + CSV merge · void/refund (flagged, not deleted) · receipt print (browser print) · product quick-edit (price/stock) · low-stock alert at a threshold · nicer mobile/touch styling.
+### Phase 2 — v1 (+6–8h, hotspot-gated)
+Scope: LAN mode (host binds `0.0.0.0`, laptop B joins by URL) · void/refund (flagged, not deleted) · product quick-edit (price/stock) · low-stock alert at a threshold · nicer touch styling.
 Acceptance:
-- B sells through a Wi-Fi outage, merges into A at close, day totals still reconcile.
+- Laptop B on the hotspot sees every sale from A and can sell simultaneously; totals reconcile.
 - Void restores stock and excludes the sale from totals; the log still shows it.
-- Receipt prints from either laptop in under 10 seconds.
+- A sale on B is tagged with device B in the log.
 
-### Phase 3 — v2 (optional, +4–6h)
-Scope: printable price list from the catalog · multi-day log view · multi-stall merge (if the fete grows) · barcode scan (any USB scanner types the product code — needs codes in the CSV, Q4 extension).
+### Phase 3 — v2 (optional, +4–6h, only if the team asks)
+Scope: browser-print of a sale/receipt · printable price list from the catalog · multi-day log view · barcode scan (USB scanner types the product code — needs codes in the CSV, Q4 extension).
 
-**Total effort: 26–34h** to a complete, rehearsed system. Cost: $0. Maintenance: none (it's a local app; the repo is the backup).
+**Total effort: 22–28h** to a complete, rehearsed system. Cost: $0. Maintenance: none (local app; the repo is the backup).
 
 ---
 
@@ -242,14 +248,13 @@ Scope: printable price list from the catalog · multi-day log view · multi-stal
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| **Venue Wi-Fi unreliable/absent** | medium | High | MVP runs on laptop A alone (no network needed). LAN mode uses the stall's own hotspot if needed. B fallback in v1. Q6. |
-| **CSV doesn't match the assumed format** | near-certain (first time) | Medium | Phase 0: get the real sample file and lock the contract before writing the importer. Errors report line+column. |
-| **Octopus reader availability / settlement** | medium | High | Confirm the reader + who brings it (Q3). App records only; the reader's own batch settlement handles the money. |
+| **Venue has no Wi-Fi** | medium | ~~High~~ → **None for MVP** | MVP binds localhost only and needs zero network. LAN mode (v1) is hotspot-gated and optional. |
+| **CSV doesn't match the assumed format** | near-certain (first time) | Medium | Phase 0: real sample file locks the contract before the importer is written. Errors report line+column. |
+| **Money-count mismatch at close** | medium | Medium | The app is explicitly *informational* — the team counts separately (A4). Day-close summary doubles as the checklist, so a mismatch is caught at the fete, not after. |
 | **Floating-point money bugs** | certain if careless | Medium | Prices stored as integer cents; no float arithmetic anywhere. |
-| **SQLite corruption (power cut)** | low | Medium | WAL mode; `sales` and `products` are small; export CSV at close is the backup. Daily autosave on the day screen. |
-| **Two laptops diverge mid-day** | low | Medium | Single shared DB in MVP; per-sale device tag; v1 merge path tested explicitly. |
-| **Scope creep (barcodes, receipts, analytics)** | medium | Low | Everything beyond §5 Phase 1 is explicitly v1/v2 and gated on rehearsal time. |
-| **Team doesn't rehearse** | medium | High | Phase 0 ends with a 1-hour dry run: both laptops, sample catalog, 20 fake sales, day close. The fete is not the first run. |
+| **SQLite corruption (power cut)** | low | Medium | WAL mode; small data; CSV export at close is the backup. |
+| **Scope creep (receipts, barcodes, LAN)** | medium | Low | Everything beyond §5 Phase 1 is v1/v2 and gated on rehearsal time or an explicit ask. |
+| **Team doesn't rehearse** | medium | High | Phase 0 ends with a 1-hour dry run: real catalog, 20 fake sales, day close. The fete is not the first run. |
 | **Price changes mid-day** | medium | Low | Quick-edit (v1); unit price snapshotted on line items, so history stays true. |
 
 ---
@@ -259,24 +264,24 @@ Scope: printable price list from the catalog · multi-day log view · multi-stal
 | Phase | Hours | Window |
 |---|---|---|
 | Phase 0 — validate | 1–2h | this week |
-| Phase 1 — MVP | 20–24h | by end of September (dry-run-able) |
-| Phase 2 — v1 | 6–10h | October, before rehearsal |
-| Phase 3 — v2 (optional) | 4–6h | only if time remains |
+| Phase 1 — MVP | 16–20h | by end of September (dry-run-able) |
+| Phase 2 — v1 | 6–8h | October, before rehearsal |
+| Phase 3 — v2 (optional) | 4–6h | only if time remains or the team asks |
 | Rehearsal | 1h | the week before the fete |
 
 Deadline 2026-10-31 leaves ~2 weeks of buffer after v1 for real-world fixes.
 
 ---
 
-## 8. Open Questions (confirm with the team this week)
+## 8. Open Questions
 
-1. **What exactly is device 2?** (Another laptop? A tablet? Affects touch-target sizing — Q1.)
-2. **Are receipts required?** (If yes: thermal 80mm printer at the stall, or browser-print on whatever printer exists — Q2.)
-3. **Octopus: does the stall have a standalone Octopus reader, and who brings it?** (App records method/amount only; the reader settles its own money — Q3.)
-4. **Can we get the real catalog CSV?** (Lock the column contract from the actual file, not a guess — Q4.)
-5. **Void/refund needed at the fete?** (MVP records only; void is v1 — Q5.)
-6. **What's the network situation at the venue?** (No Wi-Fi → single-laptop MVP is the default; some Wi-Fi → LAN mode; our own hotspot → best case — Q6.)
-7. **Is the fete one day?** (Model already supports multiple; only the close-day flow assumes one — Q7.)
+1. ✅ **RESOLVED — both devices are laptops.** Same form factor, no touch special-casing.
+2. ✅ **RESOLVED — no printed receipts.** The in-system sale log is the receipt book. Browser-print parked in v2.
+3. ✅ **RESOLVED — money is handled separately.** The app records method as an informational log field only; no payment capture or reconciliation. (Reader hardware is the team's business, not the app's.)
+4. ⏳ **PENDING — real catalog CSV sample.** The import contract above is provisional until the actual file arrives. Nothing blocks Phase 1 except locking the column order.
+5. ⏳ **PENDING (default no) — void/refund at the fete?** MVP records only; void is v1 if the team wants it.
+6. ⏳ **PENDING — is a laptop hotspot allowed at the venue?** No → single-laptop MVP forever (fully sufficient). Yes → LAN mode ships in v1.
+7. ✅ **RESOLVED — the fete is one day.** `day` column keeps multi-day free anyway.
 
 ---
 
@@ -284,9 +289,10 @@ Deadline 2026-10-31 leaves ~2 weeks of buffer after v1 for real-world fixes.
 
 Unlike the Scheduler plan (which had to verify Cloudflare/Telegram free tiers), this app is **100% local** — Flask, SQLite, and a browser are already in the team's proven toolkit (the Lateness app runs the same stack). There are no free-tier limits to verify because there is no third-party service in the critical path.
 
-*Confidence: overall 0.85. Remaining variance: Q1 (device form factor), Q3 (Octopus reader), Q6 (venue network) — each moves it ±0.05.*
+*Confidence: overall 0.9. Remaining variance: Q4 (CSV format details) and Q6 (hotspot feasibility) — each moves it ±0.05.*
 
 ---
 
 ## Update log
-- 2026-08-15: Initial plan. Requirements from Elijah: CSV catalog, 2 devices at 1 stall (laptops), fully offline, cash + Octopus, deadline end of October. Plan written as a standalone file per instruction — existing repo files untouched.
+- 2026-08-15: Initial plan. Requirements from Elijah: CSV catalog, 2 laptops at 1 stall, fully offline, cash + Octopus, deadline end of October. Plan written as a standalone file per instruction — existing repo files untouched.
+- 2026-08-15 (2nd): Open questions resolved — both devices are laptops (Q1); no printed receipts, in-system sale log instead (Q2); **money handled separately** — app logs method, never reconciles (Q3); fete is one day (Q7). Consequence: MVP is single-laptop, zero-network; LAN mode moved to v1, hotspot-gated. Sale log promoted into MVP scope. Reconciliation features dropped. Effort 22–28h, confidence 0.9. Pending: CSV sample (Q4), hotspot check (Q6), void/refund confirm (Q5).
