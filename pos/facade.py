@@ -29,6 +29,7 @@ from .domain import (
     ItemSoldOut,
     ItemStock,
     LineItem,
+    Money,
     PosError,
     RunningSummary,
     Sale,
@@ -135,24 +136,10 @@ class PosSession:
     def load_catalog(self, path: str | Path) -> int:
         items = catalog_module.load_catalog(path)
         if not items:
-            raise PosError("The catalog CSV contains no items")
+            raise PosError("The Stock sheet CSV contains no items")
         self._settings.catalog = items
         self._save_settings()
         return len(items)
-
-    def add_catalog_item(self, name: str, price: str | Decimal | float) -> None:
-        name = name.strip()
-        if not name:
-            raise PosError("Item name cannot be empty")
-        if self._settings.item(name) is not None:
-            raise PosError(f"An item named {name!r} already exists")
-        self._settings.catalog.append(Item(name=name, price=money(price)))
-        self._save_settings()
-
-    def fix_item_price(self, name: str, price: str | Decimal | float) -> None:
-        item = self._find_item(name)
-        item.price = money(price)
-        self._save_settings()
 
     def is_configured(self) -> bool:
         return self._settings.is_configured
@@ -166,17 +153,17 @@ class PosSession:
     # -- catalog / items ----------------------------------------------------
 
     def list_items(self) -> list[ItemStock]:
-        sold: dict[str, int] = {}
-        for sale in self._completed_sales():
-            for line in sale.line_items:
-                sold[line.item_name] = sold.get(line.item_name, 0) + line.quantity
+        sold_by_item = self._sold_and_revenue_by_item()
         stocks: list[ItemStock] = []
         for item in self._settings.catalog:
             remaining = None
             if item.starting_quantity is not None:
-                remaining = item.starting_quantity - sold.get(item.name, 0)
+                remaining = item.starting_quantity - sold_by_item.get(
+                    item.item_id, (0, Decimal("0"))
+                )[0]
             stocks.append(
                 ItemStock(
+                    item_id=item.item_id,
                     name=item.name,
                     price=item.price,
                     starting_quantity=item.starting_quantity,
@@ -220,7 +207,7 @@ class PosSession:
                 line.quantity += quantity
                 return
         self._current_items.append(
-            LineItem(item_name=name, quantity=quantity, price=item.price)
+            LineItem(item_id=item.item_id, item_name=name, quantity=quantity, price=item.price)
         )
 
     def set_sale_quantity(self, name: str, quantity: int) -> None:
@@ -240,7 +227,7 @@ class PosSession:
                 line.quantity = quantity
                 return
         self._current_items.append(
-            LineItem(item_name=name, quantity=quantity, price=item.price)
+            LineItem(item_id=item.item_id, item_name=name, quantity=quantity, price=item.price)
         )
 
     # -- settling -----------------------------------------------------------
@@ -361,12 +348,12 @@ class PosSession:
         cash = sum((s.tender_sum(CASH) for s in completed), Decimal("0"))
         octopus = sum((s.tender_sum(OCTOPUS) for s in completed), Decimal("0"))
         voucher = sum((s.tender_sum(VOUCHER) for s in completed), Decimal("0"))
+        name_by_id = {item.item_id: item.name for item in self._settings.catalog}
         sold_counts: dict[str, int] = {}
-        for sale in completed:
-            for line in sale.line_items:
-                sold_counts[line.item_name] = (
-                    sold_counts.get(line.item_name, 0) + line.quantity
-                )
+        for item_id, (units, _revenue) in self._sold_and_revenue_by_item().items():
+            if units:
+                name = name_by_id.get(item_id, item_id)
+                sold_counts[name] = sold_counts.get(name, 0) + units
         adjustments = self._persistence.get_cash_adjustments()
         adjustment_sum = sum((a.amount for a in adjustments), Decimal("0"))
         voids = self.list_voids()
@@ -381,12 +368,27 @@ class PosSession:
 
     # -- export -------------------------------------------------------------
 
+    def _sold_and_revenue_by_item(self) -> dict[str, tuple[int, Money]]:
+        """Final-state, non-void units and recorded revenue per item ID.
+
+        Corrections appear in their final state (one record per sale); voided
+        sales are excluded. Revenue is the actually-recorded settled value
+        (the line total at the time the sale was recorded).
+        """
+        sold: dict[str, tuple[int, Money]] = {}
+        for sale in self._completed_sales():
+            for line in sale.line_items:
+                units, revenue = sold.get(line.item_id, (0, Decimal("0")))
+                sold[line.item_id] = (units + line.quantity, revenue + line.total)
+        return sold
+
     def export_csv(self, directory: str | Path) -> list[Path]:
         self._require_configured()
         directory = Path(directory)
         directory.mkdir(parents=True, exist_ok=True)
         sales_path = directory / "sales.csv"
         items_path = directory / "items.csv"
+        report_path = directory / f"stocks-{self._settings.device_name}.csv"
         sales = self._persistence.get_sales()
 
         with open(sales_path, "w", newline="", encoding="utf-8") as handle:
@@ -426,9 +428,33 @@ class PosSession:
                         ]
                     )
 
+        with open(report_path, "w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(
+                ["ItemID", "ItemName", "Price", "Inventory", "Sales", "Revenue"]
+            )
+            sold = self._sold_and_revenue_by_item()
+            for item in self._settings.catalog:
+                units, revenue = sold.get(item.item_id, (0, Decimal("0")))
+                inventory = (
+                    str(item.starting_quantity)
+                    if item.starting_quantity is not None
+                    else ""
+                )
+                writer.writerow(
+                    [
+                        item.item_id,
+                        item.name,
+                        str(item.price),
+                        inventory,
+                        str(units),
+                        str(revenue),
+                    ]
+                )
+
         self._settings.last_export_at = self._now()
         self._save_settings()
-        return [sales_path, items_path]
+        return [sales_path, items_path, report_path]
 
     # -- wipe ---------------------------------------------------------------
 

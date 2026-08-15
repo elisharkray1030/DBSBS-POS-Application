@@ -38,19 +38,12 @@ def test_catalog_loads_items_with_prices_and_quantities(session, catalog_file):
     count = session.load_catalog(catalog_file)
     assert count == 3
     items = session.list_items()
+    assert [i.item_id for i in items] == ["MUG", "BDG", "PLUSH"]
     assert [i.name for i in items] == ["Mug", "Badge", "Plush Bear"]
     assert items[0].price == Decimal("60")
     assert items[0].starting_quantity == 20
     assert items[2].starting_quantity is None
     assert all(isinstance(i, ItemStock) for i in items)
-
-
-def test_in_app_catalog_edit_adds_item_and_fixes_price(session, catalog_file):
-    session.load_catalog(catalog_file)
-    session.add_catalog_item("Keyring", 25)
-    assert session.list_items()[-1].name == "Keyring"
-    session.fix_item_price("Mug", 65)
-    assert session.list_items()[0].price == Decimal("65")
 
 
 def test_configured_once_everything_is_set(session, catalog_file):
@@ -82,5 +75,5 @@ def test_catalog_csv_must_have_a_header(session, tmp_path):
 
 def test_catalog_retains_item_identity_after_import(configured_session):
     items = configured_session.list_items()
-    assert all(isinstance(i.name, str) for i in items)
-    assert len({i.name for i in items}) == len(items)
+    assert all(isinstance(i.item_id, str) and i.item_id for i in items)
+    assert len({i.item_id for i in items}) == len(items)

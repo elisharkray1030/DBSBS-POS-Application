@@ -9,7 +9,6 @@ from pos.domain import PosError
 
 from .dialogs import (
     AdjustmentDialog,
-    ItemDialog,
     SalesDialog,
     SettleDialog,
     fmt,
@@ -37,7 +36,6 @@ class SaleScreen(ttk.Frame):
             side="right"
         )
         ttk.Button(top, text="Sales", command=self._open_sales).pack(side="right", padx=4)
-        ttk.Button(top, text="Catalog", command=self._open_catalog).pack(side="right", padx=4)
         ttk.Button(top, text="Cash adjustment", command=self._open_adjustment).pack(
             side="right", padx=4
         )
@@ -49,11 +47,11 @@ class SaleScreen(ttk.Frame):
         left = ttk.Frame(body)
         body.add(left, weight=3)
         ttk.Label(left, text="Items").pack(anchor="w")
-        columns = ("name", "price", "remaining", "status")
+        columns = ("item_id", "name", "price", "remaining", "status")
         self.item_tree = ttk.Treeview(
             left, columns=columns, show="headings", height=20
         )
-        for col, text in zip(columns, ["Item", "Price", "Remaining", "Status"]):
+        for col, text in zip(columns, ["ID", "Item", "Price", "Remaining", "Status"]):
             self.item_tree.heading(col, text=text)
         self.item_tree.pack(fill="both", expand=True)
 
@@ -115,7 +113,7 @@ class SaleScreen(ttk.Frame):
             self.item_tree.insert(
                 "",
                 "end",
-                values=(stock.name, fmt(stock.price), remaining, status),
+                values=(stock.item_id, stock.name, fmt(stock.price), remaining, status),
                 tags=("sold_out",) if stock.sold_out else (),
             )
         self.item_tree.tag_configure("sold_out", foreground="#999999")
@@ -138,7 +136,7 @@ class SaleScreen(ttk.Frame):
         selection = self.item_tree.selection()
         if not selection:
             return None
-        return self.item_tree.item(selection[0], "values")[0]
+        return self.item_tree.item(selection[0], "values")[1]
 
     def _add_to_sale(self) -> None:
         name = self._selected_item_name()
@@ -202,11 +200,6 @@ class SaleScreen(ttk.Frame):
 
     def _open_sales(self) -> None:
         dialog = SalesDialog(self, self.session)
-        run_dialog(dialog)
-        self.refresh()
-
-    def _open_catalog(self) -> None:
-        dialog = ItemDialog(self, self.session)
         run_dialog(dialog)
         self.refresh()
 

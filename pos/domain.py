@@ -69,8 +69,14 @@ def money(value: str | Decimal | float) -> Money:
 
 @dataclass
 class Item:
-    """A physical object sold at a fixed price (CONTEXT.md: Item)."""
+    """A physical object sold at a fixed price (CONTEXT.md: Item).
 
+    `item_id` is the item's canonical identity, carried from the organizer's
+    Stock sheet (CONTEXT.md: Item ID). It is unique within the sheet and never
+    assigned in-app.
+    """
+
+    item_id: str
     name: str
     price: Money
     starting_quantity: int | None = None
@@ -86,6 +92,7 @@ class ItemStock:
     quantity. The app never infers sold-out from remaining.
     """
 
+    item_id: str
     name: str
     price: Money
     starting_quantity: int | None
@@ -95,8 +102,14 @@ class ItemStock:
 
 @dataclass
 class LineItem:
-    """One item line on a sale."""
+    """One item line on a sale.
 
+    `item_id` is the identity of the item (CONTEXT.md: Item ID) so a sale can
+    always be traced back to exactly one row of the master file; `item_name`
+    is the display name at the time the line was settled.
+    """
+
+    item_id: str
     item_name: str
     quantity: int
     price: Money  # unit price, fixed at the time the line was settled

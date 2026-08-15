@@ -1,9 +1,9 @@
 """08 — CSV export.
 
-Each device exports two comma-delimited UTF-8 files with a header row:
-sales.csv (one row per sale) and items.csv (one row per line item). Voids
-appear with a `voided` status; corrections appear in their final state with
-their original creation time.
+Each device exports comma-delimited UTF-8 files with a header row: sales.csv
+(one row per sale), items.csv (one row per line item), and the device's Stock
+sheet report `stocks-<device>.csv`. Voids appear with a `voided` status;
+corrections appear in their final state with their original creation time.
 """
 
 from __future__ import annotations
@@ -24,7 +24,11 @@ def test_export_writes_both_files_with_headers(configured_session, tmp_path):
     configured_session.settle_current_sale([Tender(CASH, Decimal("60"), tendered=Decimal("60"))])
     paths = configured_session.export_csv(tmp_path / "export")
 
-    assert paths == [tmp_path / "export" / "sales.csv", tmp_path / "export" / "items.csv"]
+    assert paths == [
+        tmp_path / "export" / "sales.csv",
+        tmp_path / "export" / "items.csv",
+        tmp_path / "export" / "stocks-Till A.csv",
+    ]
     sales_rows = read_rows(paths[0])
     assert sales_rows[0] == [
         "device", "sale_seq", "created_at", "updated_at", "status",

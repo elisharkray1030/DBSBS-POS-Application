@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS catalog (
-    name              TEXT PRIMARY KEY,
+    item_id           TEXT PRIMARY KEY,
+    name              TEXT NOT NULL,
     price             TEXT NOT NULL,
     starting_quantity INTEGER,
     sold_out          INTEGER NOT NULL DEFAULT 0
@@ -64,6 +65,7 @@ def _parse_dt(value: str) -> datetime:
 
 def _line_item_to_dict(line: LineItem) -> dict:
     return {
+        "item_id": line.item_id,
         "item_name": line.item_name,
         "quantity": line.quantity,
         "price": str(line.price),
@@ -72,6 +74,7 @@ def _line_item_to_dict(line: LineItem) -> dict:
 
 def _line_item_from_dict(data: dict) -> LineItem:
     return LineItem(
+        item_id=data.get("item_id", ""),
         item_name=data["item_name"],
         quantity=int(data["quantity"]),
         price=money(data["price"]),
@@ -121,12 +124,13 @@ class SqlitePersistence:
                 settings.last_export_at = _parse_dt(row["value"])
                 found = True
         rows = self._conn.execute(
-            "SELECT name, price, starting_quantity, sold_out FROM catalog"
+            "SELECT item_id, name, price, starting_quantity, sold_out FROM catalog"
         ).fetchall()
         if not rows and not found:
             return None
         settings.catalog = [
             Item(
+                item_id=row["item_id"],
                 name=row["name"],
                 price=money(row["price"]),
                 starting_quantity=row["starting_quantity"],
@@ -162,10 +166,11 @@ class SqlitePersistence:
             )
             self._conn.execute("DELETE FROM catalog")
             self._conn.executemany(
-                "INSERT INTO catalog (name, price, starting_quantity, sold_out)"
-                " VALUES (?, ?, ?, ?)",
+                "INSERT INTO catalog (item_id, name, price, starting_quantity, sold_out)"
+                " VALUES (?, ?, ?, ?, ?)",
                 [
                     (
+                        item.item_id,
                         item.name,
                         str(item.price),
                         item.starting_quantity,

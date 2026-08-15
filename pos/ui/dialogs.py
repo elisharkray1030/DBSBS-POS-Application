@@ -241,10 +241,10 @@ class CorrectionDialog(tk.Toplevel):
             text=f"Sale #{seq} — edit the items and settlement, then save.",
         ).pack(padx=12, pady=(12, 4))
 
-        self.lines: list[tuple[str, Decimal]] = [
-            (line.item_name, line.price) for line in sale.line_items
+        self.lines: list[tuple[str, str, Decimal]] = [
+            (line.item_id, line.item_name, line.price) for line in sale.line_items
         ]
-        self.row_vars: list[tuple[str, Decimal, tk.StringVar]] = []
+        self.row_vars: list[tuple[str, str, Decimal, tk.StringVar]] = []
 
         self.rows = ttk.Frame(self)
         self.rows.pack(fill="both", expand=True, padx=12)
@@ -277,7 +277,7 @@ class CorrectionDialog(tk.Toplevel):
         for child in self.rows.winfo_children():
             child.destroy()
         self.row_vars = []
-        for name, price in self.lines:
+        for item_id, name, price in self.lines:
             var = tk.StringVar(value="1")
             var.trace_add("write", lambda *_: self._recompute_total())
             row = ttk.Frame(self.rows)
@@ -290,17 +290,17 @@ class CorrectionDialog(tk.Toplevel):
                 text="Remove",
                 command=lambda n=name: self._remove_line(n),  # type: ignore[misc]
             ).pack(side="right")
-            self.row_vars.append((name, price, var))
+            self.row_vars.append((item_id, name, price, var))
         self._recompute_total()
 
     def _current_total(self) -> Decimal:
         total = Decimal("0")
-        for name, price, var in self.row_vars:
+        for item_id, name, price, var in self.row_vars:
             try:
                 qty = int(var.get())
             except ValueError:
                 qty = 0
-            total += LineItem(name, max(qty, 0), price).total
+            total += LineItem(item_id, name, max(qty, 0), price).total
         return total
 
     def _recompute_total(self) -> None:
@@ -312,21 +312,23 @@ class CorrectionDialog(tk.Toplevel):
         name = self.item_combo.get()
         if not name:
             return
-        price = {i.name: i.price for i in self.session.list_items()}.get(name)
-        if price is None:
+        item = next(
+            (i for i in self.session.list_items() if i.name == name), None
+        )
+        if item is None:
             return
-        self.lines.append((name, price))
+        self.lines.append((item.item_id, name, item.price))
         self._rebuild_rows()
 
     def _remove_line(self, name: str) -> None:
-        self.lines = [(n, p) for n, p in self.lines if n != name]
+        self.lines = [(i, n, p) for i, n, p in self.lines if n != name]
         self._rebuild_rows()
 
     def _save(self) -> None:
         try:
             line_items = [
-                LineItem(name, int(var.get()), price)
-                for name, price, var in self.row_vars
+                LineItem(item_id, name, int(var.get()), price)
+                for item_id, name, price, var in self.row_vars
             ]
             self.session.correct_sale(
                 self.seq, line_items, self.section.build_tenders()
@@ -337,58 +339,8 @@ class CorrectionDialog(tk.Toplevel):
         self.destroy()
 
 
-class ItemDialog(tk.Toplevel):
-    """Add an item or fix a price in the catalog."""
-
-    def __init__(self, master: tk.Misc, session) -> None:
-        super().__init__(master)
-        self.session = session
-        self.title("Catalog")
-        ttk.Label(self, text="Add an item (name + price)").pack(padx=12, pady=(12, 2))
-        row = ttk.Frame(self)
-        row.pack(padx=12)
-        self.name = ttk.Entry(row, width=16)
-        self.name.pack(side="left", padx=2)
-        self.price = ttk.Entry(row, width=8)
-        self.price.pack(side="left", padx=2)
-        ttk.Button(row, text="Add", command=self._add).pack(side="left", padx=4)
-
-        ttk.Label(self, text="Fix a price").pack(padx=12, pady=(8, 2))
-        row2 = ttk.Frame(self)
-        row2.pack(padx=12, pady=(0, 8))
-        self.names = ttk.Combobox(
-            row2,
-            values=[i.name for i in session.list_items()],
-            width=16,
-        )
-        self.names.pack(side="left", padx=2)
-        self.new_price = ttk.Entry(row2, width=8)
-        self.new_price.pack(side="left", padx=2)
-        ttk.Button(row2, text="Fix price", command=self._fix).pack(side="left", padx=4)
-
-    def _add(self) -> None:
-        try:
-            self.session.add_catalog_item(self.name.get(), money(self.price.get()))
-        except PosError as exc:
-            show_error("Cannot add item", exc)
-            return
-        self.names["values"] = [i.name for i in self.session.list_items()]
-        self.name.delete(0, "end")
-        self.price.delete(0, "end")
-
-    def _fix(self) -> None:
-        try:
-            self.session.fix_item_price(
-                self.names.get(), money(self.new_price.get())
-            )
-        except PosError as exc:
-            show_error("Cannot fix price", exc)
-            return
-        self.destroy()
-
-
 class ExportDialog(tk.Toplevel):
-    """Export the device's sales as two CSV files."""
+    """Export the device's sales as CSV files."""
 
     def __init__(self, master: tk.Misc, session) -> None:
         super().__init__(master)
@@ -396,7 +348,8 @@ class ExportDialog(tk.Toplevel):
         self.title("Export CSV")
         ttk.Label(
             self,
-            text="Choose a folder for sales.csv and items.csv.",
+            text="Choose a folder for sales.csv, items.csv, and the\n"
+            "device's Stock sheet report.",
         ).pack(padx=12, pady=(12, 4))
         self.folder = tk.StringVar()
         ttk.Entry(self, textvariable=self.folder, width=40).pack(padx=12)
@@ -420,7 +373,7 @@ class ExportDialog(tk.Toplevel):
             return
         messagebox.showinfo(
             "Export complete",
-            f"Wrote:\n{paths[0]}\n{paths[1]}",
+            "Wrote:\n" + "\n".join(str(p) for p in paths),
         )
         self.destroy()
 

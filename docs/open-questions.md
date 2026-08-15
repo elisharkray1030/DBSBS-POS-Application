@@ -17,6 +17,12 @@ All previously-open decisions were resolved with the stall's organizer on
 
 ## CSV catalog
 
+> Note: superseded on 2026-08-15 by the Stock sheet round-trip
+> (`docs/adr/0003-stock-sheet-round-trip.md`, `.scratch/stock-sheet/spec.md`).
+> The catalog is now the organizer's Stock sheet CSV
+> (`ItemID, ItemName, Price, Inventory, Sales, Revenue`); the old
+> `Name, Price, Quantity` format is no longer accepted. Kept below as history.
+
 - **Q: Offline transfer to 2 devices** — **Resolved:** the organizer copies the
   same `Name, Price, Quantity` CSV to both laptops before the event (USB stick
   / shared drive). No on-the-day transfer.

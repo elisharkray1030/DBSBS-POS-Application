@@ -22,7 +22,7 @@ class SetupScreen(ttk.Frame):
             pady=(0, 16)
         )
 
-        ttk.Label(self, text="Catalog CSV (Name, Price, Quantity):").pack(anchor="w")
+        ttk.Label(self, text="Stock sheet CSV (ItemID, ItemName, Price, Inventory, Sales, Revenue):").pack(anchor="w")
         row = ttk.Frame(self)
         row.pack(fill="x", pady=(2, 4))
         self.csv_path = tk.StringVar()

@@ -1,8 +1,12 @@
-"""Catalog loading from the `Name, Price, Quantity` CSV (CONTEXT.md: Catalog).
+"""Catalog loading from the organizer's Stock sheet CSV (CONTEXT.md: Stock
+sheet).
 
-Delimiter handling beyond comma is parked TBC in docs/open-questions.md, so
-comma is the accepted format. An empty quantity column means the item has no
-starting quantity (sell-by-demand).
+The only accepted catalog input has the header
+`ItemID, ItemName, Price, Inventory, Sales, Revenue`, matched
+case-insensitively. Each item's identity is its Item ID (unique per file,
+never assigned in-app); `Inventory` sets the starting quantity, a blank value
+meaning sell-by-demand; pre-filled `Sales`/`Revenue` values are ignored. The
+old `Name, Price, Quantity` format is rejected.
 """
 
 from __future__ import annotations
@@ -12,38 +16,71 @@ from pathlib import Path
 
 from .domain import CatalogError, Item, money
 
+_STOCK_SHEET_HEADER = [
+    "itemid",
+    "itemname",
+    "price",
+    "inventory",
+    "sales",
+    "revenue",
+]
+
 
 def load_catalog(path: str | Path) -> list[Item]:
-    with open(path, newline="", encoding="utf-8-sig") as handle:
-        reader = csv.reader(handle)
-        rows = list(reader)
+    try:
+        with open(path, newline="", encoding="utf-8-sig") as handle:
+            reader = csv.reader(handle)
+            rows = list(reader)
+    except OSError as exc:
+        raise CatalogError(f"Could not read the Stock sheet CSV: {exc}") from exc
 
     if not rows:
-        raise CatalogError("Catalog CSV is empty")
+        raise CatalogError("Stock sheet CSV is empty")
 
     header = [cell.strip().lower() for cell in rows[0]]
-    if not any(word in header[0] for word in ("name", "item")):
-        raise CatalogError("Catalog CSV must have a header row of Name, Price, Quantity")
+    if header != _STOCK_SHEET_HEADER:
+        raise CatalogError(
+            "Stock sheet CSV must have a header row of "
+            "ItemID, ItemName, Price, Inventory, Sales, Revenue"
+        )
 
     items: list[Item] = []
+    seen_ids: set[str] = set()
     for row in rows[1:]:
         cells = [cell.strip() for cell in row]
-        if not cells or not cells[0]:
+        if not any(cells):
             continue
-        if len(cells) < 2 or not cells[1]:
+        item_id = cells[0]
+        if not item_id:
+            raise CatalogError(f"Row is missing an Item ID: {cells!r}")
+        if item_id in seen_ids:
+            raise CatalogError(f"Duplicate Item ID: {item_id!r}")
+        seen_ids.add(item_id)
+
+        if len(cells) < 3 or not cells[2]:
             raise CatalogError(f"Row is missing a price: {cells!r}")
-        name = cells[0]
-        price = money(cells[1])
-        quantity_text = cells[2] if len(cells) > 2 and cells[2] else None
+        try:
+            price = money(cells[2])
+        except CatalogError:
+            raise CatalogError(
+                f"Price for item {item_id!r} is not a number: {cells[2]!r}"
+            ) from None
+
+        inventory_text = cells[3] if len(cells) > 3 else ""
         quantity: int | None = None
-        if quantity_text is not None:
+        if inventory_text:
             try:
-                quantity = int(quantity_text)
+                quantity = int(inventory_text)
             except ValueError as exc:
                 raise CatalogError(
-                    f"Starting quantity for {name!r} is not a whole number: {quantity_text!r}"
+                    f"Starting quantity for {item_id!r} is not a whole number: "
+                    f"{inventory_text!r}"
                 ) from exc
             if quantity < 0:
-                raise CatalogError(f"Starting quantity for {name!r} cannot be negative")
-        items.append(Item(name=name, price=price, starting_quantity=quantity))
+                raise CatalogError(
+                    f"Starting quantity for {item_id!r} cannot be negative"
+                )
+
+        name = cells[1]
+        items.append(Item(item_id=item_id, name=name, price=price, starting_quantity=quantity))
     return items
