@@ -7,14 +7,18 @@ Runs on two Windows laptops with no network and no installer.
 
 - Install Python 3.11+ for Windows.
 - Copy this whole folder to each laptop.
-- Double-click `main.pyw`. No console window appears. The local database
-  (`pos.db`) is created next to the launcher on first run.
+- Double-click `start.pyw`. No console window appears. On first launch it
+  installs the one external dependency (`customtkinter`) if needed — do this
+  once per laptop while connected to the internet — then launches the app. On
+  event day (no internet) the dependency is already installed and the script
+  goes straight to launching. The local database (`pos.db`) is created next
+  to the launcher on first run.
 - On first run you reach the **setup screen**: load the organizer's Stock sheet
   CSV (`ItemID, ItemName, Price, Inventory, Sales, Revenue`), enter the
   starting float, and name the device (e.g. "Till A"). After that the
   **sale screen** is the main working screen.
 
-Alternatively run `python main.pyw` from a terminal.
+Alternatively run `python start.pyw` or `python main.pyw` from a terminal.
 
 ## Stock sheet round-trip
 
@@ -56,7 +60,7 @@ Windows glue are intentionally untested.
 ```bash
 python -m pytest -q            # full suite
 python -m mypy pos             # typecheck
-python -m ruff check pos tests main.pyw   # lint
+python -m ruff check pos tests main.pyw start.pyw   # lint
 ```
 
 See `docs/spec.md`, `CONTEXT.md`, and `docs/adr/` for the domain decisions.

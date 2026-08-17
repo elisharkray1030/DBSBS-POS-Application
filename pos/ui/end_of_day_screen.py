@@ -2,52 +2,65 @@
 
 from __future__ import annotations
 
-from tkinter import ttk
+import customtkinter as ctk  # type: ignore[import-untyped]
 
+from . import style
 from .dialogs import ExportDialog, WipeDialog, fmt, run_dialog
 
 
-class EndOfDayScreen(ttk.Frame):
+class EndOfDayScreen(ctk.CTkFrame):
     """Per-device reconciliation figures for the organizer."""
 
     def __init__(self, master, app) -> None:
-        super().__init__(master, padding=12)
+        super().__init__(master, corner_radius=0)
         self.app = app
         self.session = app.session
 
-        top = ttk.Frame(self)
-        top.pack(fill="x")
-        ttk.Label(
-            top, text=f"End of day — {self.session.device_name()}", font=("Segoe UI", 14)
+        top = ctk.CTkFrame(self, fg_color="transparent")
+        top.pack(fill="x", padx=16, pady=(12, 0))
+        ctk.CTkLabel(
+            top,
+            text=f"End of day — {self.session.device_name()}",
+            font=style.FONT_HEADING,
         ).pack(side="left")
-        ttk.Button(top, text="Back to sales", command=self.app.show_sale).pack(
-            side="right"
-        )
+        ctk.CTkButton(
+            top, text="Back to sales", width=120, command=self.app.show_sale
+        ).pack(side="right")
 
         figures = self.session.end_of_day()
 
-        summary = ttk.Frame(self)
-        summary.pack(fill="x", pady=8)
-        ttk.Label(
-            summary, text=f"Expected cash: ${fmt(figures.expected_cash)}", font=("Segoe UI", 12)
-        ).pack(anchor="w")
-        ttk.Label(summary, text=f"Octopus: ${fmt(figures.octopus_total)}").pack(anchor="w")
-        ttk.Label(summary, text=f"Vouchers: ${fmt(figures.voucher_total)}").pack(anchor="w")
+        self._section(self, "Cash").pack(fill="x", padx=16, pady=(12, 4))
+        summary = ctk.CTkFrame(self, corner_radius=8, border_width=1)
+        summary.pack(fill="x", padx=16)
+        ctk.CTkLabel(
+            summary,
+            text=f"Expected cash: ${fmt(figures.expected_cash)}",
+            font=("Segoe UI", 16, "bold"),
+            anchor="w",
+        ).pack(fill="x", padx=12, pady=(8, 2))
+        ctk.CTkLabel(
+            summary, text=f"Octopus: ${fmt(figures.octopus_total)}", anchor="w"
+        ).pack(fill="x", padx=12)
+        ctk.CTkLabel(
+            summary, text=f"Vouchers: ${fmt(figures.voucher_total)}", anchor="w"
+        ).pack(fill="x", padx=12, pady=(2, 8))
 
-        ttk.Label(self, text="Items sold (this device, excluding voids)").pack(anchor="w")
-        sold = ttk.Treeview(self, columns=("item", "count"), show="headings", height=8)
-        sold.heading("item", text="Item")
-        sold.heading("count", text="Sold")
-        sold.pack(fill="x", pady=(2, 6))
+        self._section(self, "Items sold (this device, excluding voids)").pack(
+            fill="x", padx=16, pady=(12, 2)
+        )
+        sold = style.make_table(
+            self, ("item", "count"), ("Item", "Sold"), height=5
+        )
+        sold.pack(fill="x", padx=16, pady=(0, 6))
         name_by_id = {i.item_id: i.name for i in self.session.list_items()}
         for item_id, count in figures.sold_counts.items():
             sold.insert("", "end", values=(name_by_id.get(item_id, item_id), count))
 
-        ttk.Label(self, text="Voids").pack(anchor="w")
-        voids = ttk.Treeview(self, columns=("seq", "time", "total"), show="headings", height=5)
-        for col, text in zip(("seq", "time", "total"), ["Seq", "Time", "Total"]):
-            voids.heading(col, text=text)
-        voids.pack(fill="x", pady=(2, 6))
+        self._section(self, "Voids").pack(fill="x", padx=16, pady=(4, 2))
+        voids = style.make_table(
+            self, ("seq", "time", "total"), ("Seq", "Time", "Total"), height=3
+        )
+        voids.pack(fill="x", padx=16, pady=(0, 6))
         for sale in figures.voids:
             voids.insert(
                 "",
@@ -55,15 +68,11 @@ class EndOfDayScreen(ttk.Frame):
                 values=(sale.seq, sale.created_at.strftime("%H:%M"), fmt(sale.total)),
             )
 
-        ttk.Label(self, text="Cash adjustments").pack(anchor="w")
-        adjustments = ttk.Treeview(
-            self, columns=("amount", "reason", "time"), show="headings", height=4
+        self._section(self, "Cash adjustments").pack(fill="x", padx=16, pady=(4, 2))
+        adjustments = style.make_table(
+            self, ("amount", "reason", "time"), ("Amount", "Reason", "Time"), height=3
         )
-        for col, text in zip(
-            ("amount", "reason", "time"), ["Amount", "Reason", "Time"]
-        ):
-            adjustments.heading(col, text=text)
-        adjustments.pack(fill="x", pady=(2, 6))
+        adjustments.pack(fill="x", padx=16, pady=(0, 6))
         for adjustment in figures.cash_adjustments:
             adjustments.insert(
                 "",
@@ -75,12 +84,22 @@ class EndOfDayScreen(ttk.Frame):
                 ),
             )
 
-        buttons = ttk.Frame(self)
+        buttons = ctk.CTkFrame(self, fg_color="transparent")
         buttons.pack(pady=8)
-        ttk.Button(buttons, text="Export CSV", command=self._export).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Wipe for end of event", command=self._wipe).pack(
+        ctk.CTkButton(buttons, text="Export CSV", width=130, command=self._export).pack(
             side="left", padx=4
         )
+        ctk.CTkButton(
+            buttons,
+            text="Wipe for end of event",
+            width=180,
+            fg_color=style.WIPE_COLOR,
+            hover_color=style.WIPE_HOVER,
+            command=self._wipe,
+        ).pack(side="left", padx=4)
+
+    def _section(self, master, text: str) -> ctk.CTkLabel:
+        return ctk.CTkLabel(master, text=text, font=style.FONT_SECTION, anchor="w")
 
     def _export(self) -> None:
         dialog = ExportDialog(self, self.session)

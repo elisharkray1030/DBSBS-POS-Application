@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import tkinter as tk
 from decimal import Decimal
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox
+
+import customtkinter as ctk  # type: ignore[import-untyped]
 
 from pos.domain import (
     CASH,
@@ -16,6 +18,8 @@ from pos.domain import (
     money,
 )
 
+from . import style
+
 
 def fmt(amount: Decimal) -> str:
     return f"{amount:.2f}"
@@ -25,14 +29,14 @@ def show_error(title: str, exc: Exception) -> None:
     messagebox.showerror(title, str(exc))
 
 
-def run_dialog(dialog: tk.Toplevel) -> None:
+def run_dialog(dialog: ctk.CTkToplevel) -> None:
     if dialog.master is not None:
         dialog.transient(dialog.master)  # type: ignore[call-overload]
     dialog.grab_set()
     dialog.wait_window()
 
 
-class TenderSection(ttk.LabelFrame):
+class TenderSection(ctk.CTkFrame):
     """Lets the cashier choose how a sale is settled and builds the tenders.
 
     The settlement rules live in the facade; this section only assembles the
@@ -40,24 +44,28 @@ class TenderSection(ttk.LabelFrame):
     """
 
     def __init__(self, master: tk.Misc, total: Decimal) -> None:
-        super().__init__(master, text="Settlement")
+        super().__init__(master, corner_radius=8, border_width=1)
         self.total = total
         self.method = tk.StringVar(value=CASH)
+
+        ctk.CTkLabel(self, text="Settlement", font=style.FONT_SUBTITLE).grid(
+            row=0, column=0, columnspan=4, sticky="w", padx=8, pady=(8, 4)
+        )
 
         methods = [CASH, VOUCHER, OCTOPUS, "cash+voucher"]
         labels = ["Cash", "Voucher", "Octopus", "Cash + Voucher"]
         for column, (method, label) in enumerate(zip(methods, labels)):
-            ttk.Radiobutton(
+            ctk.CTkRadioButton(
                 self,
                 text=label,
                 value=method,
                 variable=self.method,
                 command=self._update_fields,
-            ).grid(row=0, column=column, sticky="w", padx=4, pady=4)
+            ).grid(row=1, column=column, sticky="w", padx=8, pady=4)
 
-        self.cash_tendered = ttk.Entry(self, width=10)
-        self.cash_portion = ttk.Entry(self, width=10)
-        self.voucher_portion = ttk.Entry(self, width=10)
+        self.cash_tendered = ctk.CTkEntry(self, width=110)
+        self.cash_portion = ctk.CTkEntry(self, width=110)
+        self.voucher_portion = ctk.CTkEntry(self, width=110)
         self._update_fields()
 
     def set_total(self, total: Decimal) -> None:
@@ -69,18 +77,20 @@ class TenderSection(ttk.LabelFrame):
         self.cash_portion.grid_remove()
         self.voucher_portion.grid_remove()
         if method == CASH:
-            self._label("Cash tendered (notes given)", 1, 0)
-            self.cash_tendered.grid(row=1, column=1, padx=4, pady=4)
+            self._label("Cash tendered (notes given)", 2, 0)
+            self.cash_tendered.grid(row=2, column=1, padx=8, pady=4, sticky="w")
         elif method == "cash+voucher":
-            self._label("Cash portion", 1, 0)
-            self.cash_portion.grid(row=1, column=1, padx=4, pady=4)
-            self._label("Cash tendered", 2, 0)
-            self.cash_tendered.grid(row=2, column=1, padx=4, pady=4)
-            self._label("Voucher portion", 3, 0)
-            self.voucher_portion.grid(row=3, column=1, padx=4, pady=4)
+            self._label("Cash portion", 2, 0)
+            self.cash_portion.grid(row=2, column=1, padx=8, pady=4, sticky="w")
+            self._label("Cash tendered", 3, 0)
+            self.cash_tendered.grid(row=3, column=1, padx=8, pady=4, sticky="w")
+            self._label("Voucher portion", 4, 0)
+            self.voucher_portion.grid(row=4, column=1, padx=8, pady=4, sticky="w")
 
     def _label(self, text: str, row: int, column: int) -> None:
-        ttk.Label(self, text=text).grid(row=row, column=column, sticky="e", padx=4)
+        ctk.CTkLabel(self, text=text).grid(
+            row=row, column=column, sticky="e", padx=8, pady=4
+        )
 
     def build_tenders(self) -> list[Tender]:
         method = self.method.get()
@@ -100,7 +110,7 @@ class TenderSection(ttk.LabelFrame):
         ]
 
 
-class SettleDialog(tk.Toplevel):
+class SettleDialog(ctk.CTkToplevel):
     """Settle the current sale."""
 
     def __init__(self, master: tk.Misc, session) -> None:
@@ -108,10 +118,14 @@ class SettleDialog(tk.Toplevel):
         self.session = session
         self.title("Settle sale")
         total = session.current_sale_total()
-        ttk.Label(self, text=f"Sale total: ${fmt(total)}").pack(padx=12, pady=(12, 4))
+        ctk.CTkLabel(
+            self, text=f"Sale total: ${fmt(total)}", font=style.FONT_HEADING
+        ).pack(padx=12, pady=(12, 8))
         self.section = TenderSection(self, total)
         self.section.pack(fill="x", padx=12, pady=4)
-        ttk.Button(self, text="Settle", command=self._settle).pack(pady=8)
+        ctk.CTkButton(self, text="Settle", command=self._settle).pack(
+            padx=12, pady=10
+        )
 
     def _settle(self) -> None:
         try:
@@ -126,25 +140,25 @@ class SettleDialog(tk.Toplevel):
         self.destroy()
 
 
-class AdjustmentDialog(tk.Toplevel):
+class AdjustmentDialog(ctk.CTkToplevel):
     """Record cash added to or removed from the till."""
 
     def __init__(self, master: tk.Misc, session) -> None:
         super().__init__(master)
         self.session = session
         self.title("Cash adjustment")
-        ttk.Label(
+        ctk.CTkLabel(
             self,
             text="Amount (positive = added, negative = removed)",
         ).grid(row=0, column=0, columnspan=2, padx=12, pady=(12, 4))
-        ttk.Label(self, text="Amount:").grid(row=1, column=0, sticky="e", padx=4)
-        self.amount = ttk.Entry(self, width=12)
-        self.amount.grid(row=1, column=1, padx=4, pady=4)
-        ttk.Label(self, text="Reason:").grid(row=2, column=0, sticky="e", padx=4)
-        self.reason = ttk.Entry(self, width=28)
-        self.reason.grid(row=2, column=1, padx=4, pady=4)
-        ttk.Button(self, text="Record", command=self._record).grid(
-            row=3, column=0, columnspan=2, pady=8
+        ctk.CTkLabel(self, text="Amount:").grid(row=1, column=0, sticky="e", padx=8)
+        self.amount = ctk.CTkEntry(self, width=140)
+        self.amount.grid(row=1, column=1, padx=8, pady=4)
+        ctk.CTkLabel(self, text="Reason:").grid(row=2, column=0, sticky="e", padx=8)
+        self.reason = ctk.CTkEntry(self, width=280)
+        self.reason.grid(row=2, column=1, padx=8, pady=4)
+        ctk.CTkButton(self, text="Record", command=self._record).grid(
+            row=3, column=0, columnspan=2, pady=10
         )
 
     def _record(self) -> None:
@@ -157,30 +171,32 @@ class AdjustmentDialog(tk.Toplevel):
         self.destroy()
 
 
-class SalesDialog(tk.Toplevel):
+class SalesDialog(ctk.CTkToplevel):
     """List recorded sales for correction or voiding."""
 
     def __init__(self, master: tk.Misc, session) -> None:
         super().__init__(master)
         self.session = session
         self.title("Recorded sales")
-        ttk.Label(
+        ctk.CTkLabel(
             self,
             text="Select a sale, then correct it in place or void it.",
-        ).pack(padx=12, pady=(12, 4))
+        ).pack(padx=12, pady=(12, 8))
 
-        columns = ("seq", "time", "status", "total")
-        self.tree = ttk.Treeview(self, columns=columns, show="headings", height=12)
-        for col, text in zip(columns, ["Seq", "Time", "Status", "Total"]):
-            self.tree.heading(col, text=text)
+        self.tree = style.make_table(
+            self,
+            ("seq", "time", "status", "total"),
+            ("Seq", "Time", "Status", "Total"),
+            height=12,
+        )
         self.tree.pack(fill="both", expand=True, padx=12)
 
-        buttons = ttk.Frame(self)
-        buttons.pack(pady=8)
-        ttk.Button(buttons, text="Correct...", command=self._correct).pack(
+        buttons = ctk.CTkFrame(self, fg_color="transparent")
+        buttons.pack(pady=10)
+        ctk.CTkButton(buttons, text="Correct...", command=self._correct).pack(
             side="left", padx=4
         )
-        ttk.Button(buttons, text="Void", command=self._void).pack(side="left", padx=4)
+        ctk.CTkButton(buttons, text="Void", command=self._void).pack(side="left", padx=4)
         self._refresh()
 
     def _refresh(self) -> None:
@@ -225,7 +241,7 @@ class SalesDialog(tk.Toplevel):
         self._refresh()
 
 
-class CorrectionDialog(tk.Toplevel):
+class CorrectionDialog(ctk.CTkToplevel):
     """Edit a recorded sale in place: change quantities, add or remove lines,
     and re-settle it."""
 
@@ -236,41 +252,45 @@ class CorrectionDialog(tk.Toplevel):
         self.title(f"Correct sale #{seq}")
         sale = session.get_sale(seq)
 
-        ttk.Label(
+        ctk.CTkLabel(
             self,
             text=f"Sale #{seq} — edit the items and settlement, then save.",
-        ).pack(padx=12, pady=(12, 4))
+        ).pack(padx=12, pady=(12, 8))
 
         self.lines: list[LineItem] = list(sale.line_items)
         self.row_vars: list[tuple[LineItem, tk.StringVar]] = []
 
-        self.rows = ttk.Frame(self)
+        self.rows = ctk.CTkFrame(self, fg_color="transparent")
         self.rows.pack(fill="both", expand=True, padx=12)
 
-        add_row = ttk.Frame(self)
+        add_row = ctk.CTkFrame(self, fg_color="transparent")
         add_row.pack(fill="x", padx=12, pady=(4, 0))
         self._combo_items = {
             f"{i.item_id} — {i.name}": i for i in session.list_items()
         }
-        self.item_combo = ttk.Combobox(
+        self.item_combo = ctk.CTkComboBox(
             add_row,
             values=list(self._combo_items),
-            width=16,
+            width=220,
         )
         self.item_combo.pack(side="left")
-        self.add_qty = ttk.Entry(add_row, width=4)
+        self.add_qty = ctk.CTkEntry(add_row, width=50)
         self.add_qty.insert(0, "1")
         self.add_qty.pack(side="left", padx=4)
-        ttk.Button(add_row, text="Add line", command=self._add_line).pack(side="left")
+        ctk.CTkButton(add_row, text="Add line", command=self._add_line).pack(
+            side="left", padx=4
+        )
 
         self.total_var = tk.StringVar()
-        ttk.Label(self, textvariable=self.total_var, font=("Segoe UI", 13)).pack(
+        ctk.CTkLabel(self, textvariable=self.total_var, font=style.FONT_HEADING).pack(
             anchor="e", padx=12, pady=(4, 0)
         )
 
         self.section = TenderSection(self, sale.total)
         self.section.pack(fill="x", padx=12, pady=4)
-        ttk.Button(self, text="Save correction", command=self._save).pack(pady=8)
+        ctk.CTkButton(self, text="Save correction", command=self._save).pack(
+            padx=12, pady=10
+        )
 
         self._rebuild_rows()
 
@@ -283,16 +303,19 @@ class CorrectionDialog(tk.Toplevel):
         for line in self.lines:
             var = tk.StringVar(value=str(line.quantity))
             var.trace_add("write", lambda *_: self._recompute_total())
-            row = ttk.Frame(self.rows)
+            row = ctk.CTkFrame(self.rows, fg_color="transparent")
             row.pack(fill="x")
-            ttk.Label(row, text=line.item_name, width=18, anchor="w").pack(side="left")
-            ttk.Label(row, text=f"${fmt(line.price)}", width=8).pack(side="left")
-            ttk.Entry(row, textvariable=var, width=5).pack(side="left", padx=4)
-            ttk.Button(
+            ctk.CTkLabel(row, text=line.item_name, width=180, anchor="w").pack(
+                side="left"
+            )
+            ctk.CTkLabel(row, text=f"${fmt(line.price)}", width=90).pack(side="left")
+            ctk.CTkEntry(row, textvariable=var, width=60).pack(side="left", padx=4)
+            ctk.CTkButton(
                 row,
                 text="Remove",
+                width=80,
                 command=lambda item_id=line.item_id: self._remove_line(item_id),  # type: ignore[misc]
-            ).pack(side="right")
+            ).pack(side="right", padx=4)
             self.row_vars.append((line, var))
         self._recompute_total()
 
@@ -348,22 +371,26 @@ class CorrectionDialog(tk.Toplevel):
         self.destroy()
 
 
-class ExportDialog(tk.Toplevel):
+class ExportDialog(ctk.CTkToplevel):
     """Export the device's sales as CSV files."""
 
     def __init__(self, master: tk.Misc, session) -> None:
         super().__init__(master)
         self.session = session
         self.title("Export CSV")
-        ttk.Label(
+        ctk.CTkLabel(
             self,
             text="Choose a folder for sales.csv, items.csv, and the\n"
             "device's Stock sheet report.",
-        ).pack(padx=12, pady=(12, 4))
+        ).pack(padx=12, pady=(12, 8))
         self.folder = tk.StringVar()
-        ttk.Entry(self, textvariable=self.folder, width=40).pack(padx=12)
-        ttk.Button(self, text="Browse...", command=self._browse).pack(pady=4)
-        ttk.Button(self, text="Export", command=self._export).pack(pady=(0, 8))
+        ctk.CTkEntry(self, textvariable=self.folder, width=360).pack(padx=12)
+        ctk.CTkButton(self, text="Browse...", command=self._browse).pack(
+            padx=12, pady=6
+        )
+        ctk.CTkButton(self, text="Export", command=self._export).pack(
+            padx=12, pady=(0, 12)
+        )
 
     def _browse(self) -> None:
         chosen = filedialog.askdirectory(parent=self)
@@ -387,7 +414,7 @@ class ExportDialog(tk.Toplevel):
         self.destroy()
 
 
-class WipeDialog(tk.Toplevel):
+class WipeDialog(ctk.CTkToplevel):
     """Wipe the local database for the end of the event.
 
     The facade blocks the wipe until the end-of-day export has been taken.
@@ -400,15 +427,17 @@ class WipeDialog(tk.Toplevel):
         self.session = session
         self.on_wipe = on_wipe
         self.title("Wipe for end of event")
-        ttk.Label(
+        ctk.CTkLabel(
             self,
             text="This permanently deletes all sales, the catalog, adjustments,\n"
             "and settings from this device. You must export first.\n"
             "Type the word 'wipe' to confirm.",
-        ).pack(padx=16, pady=(12, 6))
-        self.entry = ttk.Entry(self, width=20)
+        ).pack(padx=16, pady=(12, 8))
+        self.entry = ctk.CTkEntry(self, width=160)
         self.entry.pack(padx=12)
-        ttk.Button(self, text="Wipe database", command=self._wipe).pack(pady=8)
+        ctk.CTkButton(self, text="Wipe database", command=self._wipe).pack(
+            padx=12, pady=12
+        )
 
     def _wipe(self) -> None:
         if self.entry.get().strip().lower() != "wipe":

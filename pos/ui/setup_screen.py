@@ -3,52 +3,66 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox
+
+import customtkinter as ctk  # type: ignore[import-untyped]
 
 from pos.domain import PosError, money
 
+from . import style
 from .dialogs import show_error
 
 
-class SetupScreen(ttk.Frame):
+class SetupScreen(ctk.CTkFrame):
     """Load the catalog CSV, enter the float and the device name."""
 
     def __init__(self, master, app) -> None:
-        super().__init__(master, padding=24)
+        super().__init__(master, corner_radius=0)
         self.app = app
         self.session = app.session
 
-        ttk.Label(self, text="DBS Garden Fete POS — setup", font=("Segoe UI", 16)).pack(
-            pady=(0, 16)
+        ctk.CTkLabel(self, text="DBS Garden Fete POS — setup", font=style.FONT_TITLE).pack(
+            padx=24, pady=(16, 12)
         )
 
-        ttk.Label(
+        ctk.CTkLabel(
             self,
             text="Stock sheet CSV "
             "(ItemID, ItemName, Price, Inventory, Sales, Revenue):",
-        ).pack(anchor="w")
-        row = ttk.Frame(self)
-        row.pack(fill="x", pady=(2, 4))
+            anchor="w",
+        ).pack(padx=24, fill="x")
+        row = ctk.CTkFrame(self)
+        row.pack(fill="x", padx=24, pady=(4, 2))
         self.csv_path = tk.StringVar()
-        ttk.Entry(row, textvariable=self.csv_path, width=40).pack(side="left", padx=(0, 4))
-        ttk.Button(row, text="Browse...", command=self._browse).pack(side="left")
+        ctk.CTkEntry(
+            row, textvariable=self.csv_path, width=320
+        ).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(row, text="Browse...", width=100, command=self._browse).pack(
+            side="left"
+        )
         self.csv_status = tk.StringVar(value="")
-        ttk.Label(self, textvariable=self.csv_status).pack(anchor="w", pady=(0, 8))
+        ctk.CTkLabel(
+            self, textvariable=self.csv_status, anchor="w", text_color="gray"
+        ).pack(padx=24, fill="x", pady=(0, 8))
 
-        ttk.Label(self, text="Starting float (HK$):").pack(anchor="w")
+        ctk.CTkLabel(self, text="Starting float (HK$):", anchor="w").pack(
+            padx=24, fill="x"
+        )
         self.float_var = tk.StringVar()
-        ttk.Entry(self, textvariable=self.float_var, width=12).pack(
-            anchor="w", pady=(2, 8)
+        ctk.CTkEntry(self, textvariable=self.float_var, width=120).pack(
+            padx=24, anchor="w", pady=(4, 8)
         )
 
-        ttk.Label(self, text="Device name (e.g. Till A):").pack(anchor="w")
+        ctk.CTkLabel(self, text="Device name (e.g. Till A):", anchor="w").pack(
+            padx=24, fill="x"
+        )
         self.device_var = tk.StringVar()
-        ttk.Entry(self, textvariable=self.device_var, width=20).pack(
-            anchor="w", pady=(2, 8)
+        ctk.CTkEntry(self, textvariable=self.device_var, width=200).pack(
+            padx=24, anchor="w", pady=(4, 8)
         )
 
-        ttk.Button(self, text="Start the day", command=self._start).pack(
-            pady=(8, 0)
+        ctk.CTkButton(self, text="Start the day", width=200, command=self._start).pack(
+            padx=24, pady=(8, 16)
         )
 
         self._loaded = False

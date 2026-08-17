@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox
+
+import customtkinter as ctk  # type: ignore[import-untyped]
 
 from pos.domain import PosError
 
+from . import style
 from .dialogs import (
     AdjustmentDialog,
     SalesDialog,
@@ -17,89 +20,102 @@ from .dialogs import (
 )
 
 
-class SaleScreen(ttk.Frame):
+class SaleScreen(ctk.CTkFrame):
     """Build and settle sales, manage sold-out, adjustments and corrections."""
 
     def __init__(self, master, app) -> None:
-        super().__init__(master, padding=12)
+        super().__init__(master, corner_radius=0)
         self.app = app
         self.session = app.session
 
-        top = ttk.Frame(self)
-        top.pack(fill="x")
-        ttk.Label(
-            top, text=f"Device: {self.session.device_name()}", font=("Segoe UI", 12)
+        top = ctk.CTkFrame(self, fg_color="transparent")
+        top.pack(fill="x", padx=12, pady=(12, 0))
+        ctk.CTkLabel(
+            top, text=f"Device: {self.session.device_name()}", font=style.FONT_SUBTITLE
         ).pack(side="left")
         self.summary_var = tk.StringVar()
-        ttk.Label(top, textvariable=self.summary_var).pack(side="left", padx=16)
-        ttk.Button(top, text="End of day", command=self.app.show_end_of_day).pack(
-            side="right"
-        )
-        ttk.Button(top, text="Sales", command=self._open_sales).pack(side="right", padx=4)
-        ttk.Button(top, text="Cash adjustment", command=self._open_adjustment).pack(
-            side="right", padx=4
-        )
+        ctk.CTkLabel(top, textvariable=self.summary_var).pack(side="left", padx=16)
+        ctk.CTkButton(
+            top, text="End of day", width=120, command=self.app.show_end_of_day
+        ).pack(side="right")
+        ctk.CTkButton(
+            top, text="Sales", width=90, command=self._open_sales
+        ).pack(side="right", padx=4)
+        ctk.CTkButton(
+            top, text="Cash adjustment", width=150, command=self._open_adjustment
+        ).pack(side="right", padx=4)
 
-        body = ttk.PanedWindow(self, orient="horizontal")
-        body.pack(fill="both", expand=True, pady=8)
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=12, pady=8)
+        body.columnconfigure(0, weight=3)
+        body.columnconfigure(1, weight=2)
+        body.rowconfigure(0, weight=1)
 
         # Left: item list
-        left = ttk.Frame(body)
-        body.add(left, weight=3)
-        ttk.Label(left, text="Items").pack(anchor="w")
-        columns = ("item_id", "name", "price", "remaining", "status")
-        self.item_tree = ttk.Treeview(
-            left, columns=columns, show="headings", height=20
+        left = ctk.CTkFrame(body, fg_color="transparent")
+        left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        ctk.CTkLabel(left, text="Items", anchor="w").pack(fill="x")
+        self.item_tree = style.make_table(
+            left,
+            ("item_id", "name", "price", "remaining", "status"),
+            ("ID", "Item", "Price", "Remaining", "Status"),
+            height=20,
         )
-        for col, text in zip(columns, ["ID", "Item", "Price", "Remaining", "Status"]):
-            self.item_tree.heading(col, text=text)
-        self.item_tree.pack(fill="both", expand=True)
+        self.item_tree.pack(fill="both", expand=True, pady=(4, 4))
 
-        controls = ttk.Frame(left)
-        controls.pack(fill="x", pady=4)
-        ttk.Label(controls, text="Qty:").pack(side="left")
+        controls = ctk.CTkFrame(left, fg_color="transparent")
+        controls.pack(fill="x", pady=(0, 4))
+        ctk.CTkLabel(controls, text="Qty:").pack(side="left")
         self.qty_var = tk.StringVar(value="1")
-        ttk.Entry(controls, textvariable=self.qty_var, width=4).pack(side="left")
-        ttk.Button(controls, text="Add to sale", command=self._add_to_sale).pack(
-            side="left", padx=4
-        )
-        ttk.Button(controls, text="Toggle sold-out", command=self._toggle_sold_out).pack(
-            side="left", padx=4
-        )
+        ctk.CTkEntry(controls, textvariable=self.qty_var, width=50).pack(side="left")
+        ctk.CTkButton(
+            controls, text="Add to sale", width=110, command=self._add_to_sale
+        ).pack(side="left", padx=4)
+        ctk.CTkButton(
+            controls, text="Toggle sold-out", width=130, command=self._toggle_sold_out
+        ).pack(side="left", padx=4)
 
         # Right: current sale
-        right = ttk.Frame(body)
-        body.add(right, weight=2)
-        ttk.Label(right, text="Current sale").pack(anchor="w")
-        sale_columns = ("item", "qty", "total")
-        self.sale_tree = ttk.Treeview(
-            right, columns=sale_columns, show="headings", height=12
+        right = ctk.CTkFrame(body, fg_color="transparent")
+        right.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        ctk.CTkLabel(right, text="Current sale", anchor="w").pack(fill="x")
+        self.sale_tree = style.make_table(
+            right, ("item", "qty", "total"), ("Item", "Qty", "Total"), height=12
         )
-        for col, text in zip(sale_columns, ["Item", "Qty", "Total"]):
-            self.sale_tree.heading(col, text=text)
-        self.sale_tree.pack(fill="both", expand=True)
+        self.sale_tree.pack(fill="both", expand=True, pady=(4, 4))
 
-        sale_controls = ttk.Frame(right)
-        sale_controls.pack(fill="x", pady=4)
+        sale_controls = ctk.CTkFrame(right, fg_color="transparent")
+        sale_controls.pack(fill="x", pady=(0, 4))
         self.sale_qty_var = tk.StringVar(value="1")
-        ttk.Entry(sale_controls, textvariable=self.sale_qty_var, width=4).pack(
-            side="left"
-        )
-        ttk.Button(sale_controls, text="Set qty", command=self._set_qty).pack(
-            side="left", padx=4
-        )
-        ttk.Button(sale_controls, text="Remove", command=self._remove_from_sale).pack(
-            side="left", padx=4
-        )
-        ttk.Button(sale_controls, text="New sale", command=self._new_sale).pack(
-            side="right"
-        )
+        ctk.CTkEntry(
+            sale_controls, textvariable=self.sale_qty_var, width=50
+        ).pack(side="left")
+        ctk.CTkButton(
+            sale_controls, text="Set qty", width=80, command=self._set_qty
+        ).pack(side="left", padx=4)
+        ctk.CTkButton(
+            sale_controls, text="Remove", width=80, command=self._remove_from_sale
+        ).pack(side="left", padx=4)
+        ctk.CTkButton(
+            sale_controls, text="New sale", width=90, command=self._new_sale
+        ).pack(side="right")
 
         self.total_var = tk.StringVar()
-        ttk.Label(right, textvariable=self.total_var, font=("Segoe UI", 14)).pack(
-            anchor="e"
-        )
-        ttk.Button(right, text="Settle", command=self._settle).pack(fill="x", pady=4)
+        ctk.CTkLabel(
+            right,
+            textvariable=self.total_var,
+            font=style.FONT_TOTAL,
+            anchor="e",
+        ).pack(fill="x", pady=(4, 0))
+        ctk.CTkButton(
+            right,
+            text="Settle",
+            height=40,
+            font=style.FONT_BUTTON,
+            fg_color=style.SETTLE_COLOR,
+            hover_color=style.SETTLE_HOVER,
+            command=self._settle,
+        ).pack(fill="x", pady=(6, 0))
 
         self.refresh()
 
@@ -116,7 +132,7 @@ class SaleScreen(ttk.Frame):
                 values=(stock.item_id, stock.name, fmt(stock.price), remaining, status),
                 tags=("sold_out",) if stock.sold_out else (),
             )
-        self.item_tree.tag_configure("sold_out", foreground="#999999")
+        style.configure_sold_out_tag(self.item_tree)
 
         self.sale_tree.delete(*self.sale_tree.get_children())
         for line in self.session.current_sale_items():
@@ -132,6 +148,9 @@ class SaleScreen(ttk.Frame):
         self.summary_var.set(
             f"Takings: ${fmt(summary.takings)}   Sales: {summary.sale_count}"
         )
+
+    def reapply_theme(self) -> None:
+        style.configure_sold_out_tag(self.item_tree)
 
     def _selected_item_id(self):
         selection = self.item_tree.selection()
@@ -191,8 +210,6 @@ class SaleScreen(ttk.Frame):
 
     def _settle(self) -> None:
         if not self.session.current_sale_items():
-            from tkinter import messagebox
-
             messagebox.showinfo("No sale", "The current sale is empty.")
             return
         dialog = SettleDialog(self, self.session)
