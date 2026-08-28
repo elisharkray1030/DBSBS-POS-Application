@@ -73,12 +73,8 @@ class Item:
 
     `item_id` is the item's canonical identity, carried from the organizer's
     Stock sheet (CONTEXT.md: Item ID). It is unique within the sheet and never
-    assigned in-app.
-
-    `raw_cells` holds the ItemID, ItemName, Price, and Inventory cells exactly
-    as the master file delivered them (before any stripping or parsing). The
-    Stock sheet report writes them back verbatim so the master file's data
-    round-trips untouched. It is None only for items not built from a file.
+    assigned in-app. Source-cell preservation lives in the Stock sheet module,
+    not on the domain item.
     """
 
     item_id: str
@@ -86,7 +82,6 @@ class Item:
     price: Money
     starting_quantity: int | None = None
     sold_out: bool = False
-    raw_cells: tuple[str, str, str, str] | None = None
 
 
 @dataclass
@@ -186,6 +181,7 @@ class Settings:
     device_name: str = ""
     float_amount: Money | None = None
     catalog: list[Item] = field(default_factory=list)
+    source_cells: dict[str, tuple[str, str, str, str]] = field(default_factory=dict)
     last_export_at: datetime | None = None
 
     @property
@@ -201,6 +197,9 @@ class Settings:
             if item.item_id == item_id:
                 return item
         return None
+
+    def source_cells_for(self, item_id: str) -> tuple[str, str, str, str] | None:
+        return self.source_cells.get(item_id)
 
 
 @dataclass

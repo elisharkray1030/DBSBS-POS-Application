@@ -14,7 +14,7 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
-from . import catalog as catalog_module
+from . import stock_sheet
 from .domain import (
     CASH,
     COMPLETED,
@@ -134,12 +134,11 @@ class PosSession:
         self._save_settings()
 
     def load_catalog(self, path: str | Path) -> int:
-        items = catalog_module.load_catalog(path)
-        if not items:
-            raise PosError("The Stock sheet CSV contains no items")
-        self._settings.catalog = items
+        loaded = stock_sheet.load_catalog(path)
+        self._settings.catalog = loaded.items
+        self._settings.source_cells = loaded.source_cells
         self._save_settings()
-        return len(items)
+        return len(loaded.items)
 
     def is_configured(self) -> bool:
         return self._settings.is_configured
@@ -428,20 +427,12 @@ class PosSession:
 
         with open(report_path, "w", newline="", encoding="utf-8") as handle:
             writer = csv.writer(handle)
-            writer.writerow(catalog_module.STOCK_SHEET_HEADER)
+            writer.writerow(stock_sheet.STOCK_SHEET_HEADER)
             sold = self._sold_and_revenue_by_item()
-            for item in self._settings.catalog:
-                units, revenue = sold.get(item.item_id, (0, Decimal("0")))
-                if item.raw_cells is not None:
-                    passthrough = list(item.raw_cells)
-                else:
-                    inventory = (
-                        str(item.starting_quantity)
-                        if item.starting_quantity is not None
-                        else ""
-                    )
-                    passthrough = [item.item_id, item.name, str(item.price), inventory]
-                writer.writerow(passthrough + [str(units), str(revenue)])
+            rows = stock_sheet.build_report_rows(
+                self._settings.catalog, sold, self._settings.source_cells
+            )
+            writer.writerows(rows)
 
         self._settings.last_export_at = self._now()
         self._save_settings()

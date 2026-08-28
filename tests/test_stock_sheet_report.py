@@ -96,7 +96,7 @@ def test_master_file_is_never_modified(configured_session, catalog_file, tmp_pat
     assert catalog_file.read_text(encoding="utf-8") == original
 
 
-def test_report_echoes_raw_cells_verbatim(session, tmp_path):
+def test_report_echoes_source_cells_verbatim(session, tmp_path):
     sheet = tmp_path / "stock.csv"
     sheet.write_text(
         "ItemID,ItemName,Price,Inventory,Sales,Revenue\n"

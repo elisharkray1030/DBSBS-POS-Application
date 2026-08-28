@@ -48,6 +48,10 @@ _Avoid_: Menu, product list
 The organizer's master CSV listing every item, with columns `ItemID, ItemName, Price, Inventory, Sales, Revenue`. Loaded into the app as the catalog before the event; at the end of the day each device writes out a new report file with the same columns, filling only its own Sales and Revenue (the source file is left untouched), and the organizer combines the two devices' reports by hand.
 _Avoid_: Stocks file, stock list
 
+**Source cells**:
+The four cells `ItemID, ItemName, Price, Inventory` of a Stock sheet row exactly as the organizer's file delivered them, before any stripping or parsing. Written back unchanged on the Stock sheet report so the round-trip is lossless.
+_Avoid_: Raw cells, original cells
+
 **Device**:
 One of the two Windows laptops the stall operates on event day. Each device is used by a single cashier at a time and has its own copy of the catalog. The devices have no network between them.
 _Avoid_: Machine, register, terminal
