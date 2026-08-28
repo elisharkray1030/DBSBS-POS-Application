@@ -1,7 +1,7 @@
 # Spec: CustomTkinter UI migration
 
 > Feature spec, published by `/to-spec`.
-> **Status: ready-for-agent**
+> **Status: done**
 >
 > Does not amend the canonical spec (`.scratch/dbsbs-pos/spec.md`) or the
 > Stock sheet spec (`.scratch/stock-sheet/spec.md`) — all functional behavior

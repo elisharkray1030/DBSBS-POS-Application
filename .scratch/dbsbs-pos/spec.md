@@ -1,7 +1,7 @@
 # Spec: DBS Garden Fete POS (single-stall offline register)
 
-> Canonical spec. Lives in `.scratch/dbsbs-pos/spec.md` so the tracker skills
-> find it alongside the tickets; visible on GitHub via the repo.
+> Canonical spec. Lives in `.scratch/dbsbs-pos/spec.md`; its tickets live on
+> GitHub Issues (see `docs/agents/issue-tracker.md`).
 >
 > Amended by `.scratch/stock-sheet/spec.md` (Stock sheet round-trip): the
 > catalog is loaded from the organizer's Stock sheet and is read-only; the

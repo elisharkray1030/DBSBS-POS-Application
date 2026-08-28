@@ -1,7 +1,7 @@
 # Spec: Dark-mode table header contrast fix
 
 > Feature spec, published by `/to-spec`.
-> **Status: ready-for-agent**
+> **Status: done**
 >
 > Amends the visual layer of `.scratch/customtkinter-ui/spec.md` — no functional change to sales, settlement, catalog, or export. All vocabulary follows `CONTEXT.md`; ADRs 0001 (no in-app sync), 0002 (standalone Octopus), and 0003 (Stock sheet round-trip) stand and are not contradicted.
 > Covers only the shared table styling used across the stall's two Devices.
