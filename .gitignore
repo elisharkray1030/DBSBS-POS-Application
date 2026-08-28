@@ -9,6 +9,9 @@ __pycache__/
 # Runtime device data (created next to main.pyw)
 *.db
 
+# Sample/scratch data files
+InventoryCSV.csv
+
 # Virtual environments
 .venv/
 venv/
