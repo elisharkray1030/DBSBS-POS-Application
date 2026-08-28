@@ -40,7 +40,7 @@ _COLORS = {
         "fg": "#1a1a1a",
         "field": "#f7f7f7",
         "header_bg": "#dbe4ee",
-        "header_fg": "#1a1a1a",
+        "header_fg": "#0f172a",
         "select_bg": "#3b8ed0",
         "select_fg": "#ffffff",
         "sold_out": "#9e9e9e",
@@ -50,7 +50,7 @@ _COLORS = {
         "fg": "#e6e6e6",
         "field": "#2b2b2b",
         "header_bg": "#333333",
-        "header_fg": "#e6e6e6",
+        "header_fg": "#ffffff",
         "select_bg": "#3b8ed0",
         "select_fg": "#ffffff",
         "sold_out": "#6e6e6e",
@@ -67,6 +67,13 @@ def configure_treeview_style() -> None:
     """Apply the current appearance mode's colors to the shared styles."""
     c = palette()
     style = ttk.Style()
+    # Windows 'vista' theme ignores Treeview.Heading background/foreground,
+    # which is why headers were invisible in dark mode (white-on-white).
+    # 'clam' respects heading colors in both light and dark.
+    try:
+        style.theme_use("clam")
+    except tk.TclError:
+        pass
     style.configure(
         "Treeview",
         font=_TABLE_FONT,
