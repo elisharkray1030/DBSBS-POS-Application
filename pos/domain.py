@@ -222,15 +222,3 @@ class RunningSummary:
 
     takings: Money
     sale_count: int
-
-
-@dataclass
-class EndOfDay:
-    """Per-device end-of-day reconciliation figures (CONTEXT.md)."""
-
-    expected_cash: Money
-    octopus_total: Money
-    voucher_total: Money
-    sold_counts: dict[str, int]  # keyed by Item ID
-    voids: list[Sale]
-    cash_adjustments: list[CashAdjustment]
