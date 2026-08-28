@@ -6,7 +6,7 @@ Offline POS Application for DBS Garden Fete.
 
 ### Issue tracker
 
-Issues and specs live as GitHub issues in this repo. See `docs/agents/issue-tracker.md`.
+Issues and specs live as markdown files under `.scratch/` in this repo. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

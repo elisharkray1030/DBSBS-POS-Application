@@ -1,7 +1,14 @@
+# Python caches
 __pycache__/
 *.py[cod]
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
+# Runtime device data (created next to main.pyw)
 *.db
 
+# Virtual environments
 .venv/
 venv/

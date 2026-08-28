@@ -1,0 +1,12 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["pos"]
+
+[tool.ruff.lint]
+extend-ignore = [
+    "FURB157",  # Decimal("60") is deliberate: string construction is exact
+    "DTZ001",   # naive local time is intentional for an offline device
+]
