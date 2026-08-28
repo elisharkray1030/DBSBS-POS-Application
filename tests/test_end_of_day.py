@@ -40,7 +40,7 @@ def test_end_of_day_shows_expected_cash_with_adjustments(configured_session):
     assert end_of_day.expected_cash == Decimal("500") + Decimal("60") + Decimal("170")
 
 
-def test_end_of_day_shows_per_item_sold_counts_excluding_voids(configured_session):
+def test_end_of_day_shows_items_sold_per_item_excluding_voids(configured_session):
     configured_session.add_item_to_sale("MUG", 2)
     configured_session.settle_current_sale([Tender(CASH, Decimal("120"), tendered=Decimal("120"))])
     configured_session.add_item_to_sale("BDG", 1)
@@ -50,7 +50,10 @@ def test_end_of_day_shows_per_item_sold_counts_excluding_voids(configured_sessio
     configured_session.void_sale(2)
 
     end_of_day = configured_session.end_of_day()
-    assert end_of_day.sold_counts == {"MUG": 2, "BDG": 3}
+    assert [(row.item_id, row.count) for row in end_of_day.sold_rows] == [
+        ("MUG", 2),
+        ("BDG", 3),
+    ]
 
 
 def test_end_of_day_shows_the_voids_list(configured_session):
@@ -89,7 +92,7 @@ def test_end_of_day_is_per_device(clock, catalog_file):
     b.add_item_to_sale("BDG", 1)
     b.settle_current_sale([Tender(OCTOPUS, Decimal("15"))])
 
-    assert a.end_of_day().sold_counts == {"MUG": 1}
-    assert b.end_of_day().sold_counts == {"BDG": 1}
+    assert [(row.item_id, row.count) for row in a.end_of_day().sold_rows] == [("MUG", 1)]
+    assert [(row.item_id, row.count) for row in b.end_of_day().sold_rows] == [("BDG", 1)]
     assert a.end_of_day().octopus_total == Decimal("0")
     assert b.end_of_day().expected_cash == Decimal("500")

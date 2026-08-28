@@ -8,13 +8,12 @@ settings, and persists every completed sale immediately.
 
 from __future__ import annotations
 
-import csv
 from collections.abc import Callable
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
-from . import catalog as catalog_module
+from . import reporting, stock_sheet
 from .domain import (
     CASH,
     COMPLETED,
@@ -22,14 +21,12 @@ from .domain import (
     VOIDED,
     VOUCHER,
     CashAdjustment,
-    EndOfDay,
     InvalidSettlement,
     Item,
     ItemNotFound,
     ItemSoldOut,
     ItemStock,
     LineItem,
-    Money,
     PosError,
     RunningSummary,
     Sale,
@@ -114,9 +111,6 @@ class PosSession:
         if not self._settings.is_configured:
             raise SetupError("The device is not set up yet")
 
-    def _completed_sales(self) -> list[Sale]:
-        return [s for s in self._persistence.get_sales() if s.status == COMPLETED]
-
     # -- setup --------------------------------------------------------------
 
     def set_device_name(self, name: str) -> None:
@@ -134,12 +128,11 @@ class PosSession:
         self._save_settings()
 
     def load_catalog(self, path: str | Path) -> int:
-        items = catalog_module.load_catalog(path)
-        if not items:
-            raise PosError("The Stock sheet CSV contains no items")
-        self._settings.catalog = items
+        loaded = stock_sheet.load_catalog(path)
+        self._settings.catalog = loaded.items
+        self._settings.source_cells = loaded.source_cells
         self._save_settings()
-        return len(items)
+        return len(loaded.items)
 
     def is_configured(self) -> bool:
         return self._settings.is_configured
@@ -153,12 +146,12 @@ class PosSession:
     # -- catalog / items ----------------------------------------------------
 
     def list_items(self) -> list[ItemStock]:
-        sold_by_item = self._sold_and_revenue_by_item()
+        sold = reporting.aggregate_sold_and_revenue(self._persistence.get_sales())
         stocks: list[ItemStock] = []
         for item in self._settings.catalog:
             remaining = None
             if item.starting_quantity is not None:
-                remaining = item.starting_quantity - sold_by_item.get(
+                remaining = item.starting_quantity - sold.get(
                     item.item_id, (0, Decimal("0"))
                 )[0]
             stocks.append(
@@ -310,7 +303,7 @@ class PosSession:
         self._persistence.save_sale(voided)
 
     def list_voids(self) -> list[Sale]:
-        return [s for s in self._persistence.get_sales() if s.status != COMPLETED]
+        return reporting.voids(self._persistence.get_sales())
 
     # -- cash adjustments ---------------------------------------------------
 
@@ -333,119 +326,38 @@ class PosSession:
 
     def running_summary(self) -> RunningSummary:
         self._require_configured()
-        completed = self._completed_sales()
-        return RunningSummary(
-            takings=sum((s.total for s in completed), Decimal("0")),
-            sale_count=len(completed),
-        )
+        sales = self._persistence.get_sales()
+        sold = reporting.aggregate_sold_and_revenue(sales)
+        takings = sum((revenue for _units, revenue in sold.values()), Decimal("0"))
+        sale_count = sum(1 for s in sales if s.status == COMPLETED)
+        return RunningSummary(takings=takings, sale_count=sale_count)
 
-    def end_of_day(self) -> EndOfDay:
+    def end_of_day(self) -> reporting.EndOfDay:
         self._require_configured()
         float_amount = self._settings.float_amount
         if float_amount is None:
             raise SetupError("No float recorded")
-        completed = self._completed_sales()
-        cash = sum((s.tender_sum(CASH) for s in completed), Decimal("0"))
-        octopus = sum((s.tender_sum(OCTOPUS) for s in completed), Decimal("0"))
-        voucher = sum((s.tender_sum(VOUCHER) for s in completed), Decimal("0"))
-        sold_counts: dict[str, int] = {}
-        for item_id, (units, _revenue) in self._sold_and_revenue_by_item().items():
-            if units:
-                sold_counts[item_id] = sold_counts.get(item_id, 0) + units
-        adjustments = self._persistence.get_cash_adjustments()
-        adjustment_sum = sum((a.amount for a in adjustments), Decimal("0"))
-        voids = self.list_voids()
-        return EndOfDay(
-            expected_cash=float_amount + cash + adjustment_sum,
-            octopus_total=octopus,
-            voucher_total=voucher,
-            sold_counts=sold_counts,
-            voids=voids,
-            cash_adjustments=adjustments,
+        return reporting.build_end_of_day(
+            float_amount=float_amount,
+            sales=self._persistence.get_sales(),
+            adjustments=self._persistence.get_cash_adjustments(),
+            catalog=self._settings.catalog,
         )
 
     # -- export -------------------------------------------------------------
 
-    def _sold_and_revenue_by_item(self) -> dict[str, tuple[int, Money]]:
-        """Final-state, non-void units and recorded revenue per item ID.
-
-        Corrections appear in their final state (one record per sale); voided
-        sales are excluded. Revenue is the actually-recorded settled value
-        (the line total at the time the sale was recorded).
-        """
-        sold: dict[str, tuple[int, Money]] = {}
-        for sale in self._completed_sales():
-            for line in sale.line_items:
-                units, revenue = sold.get(line.item_id, (0, Decimal("0")))
-                sold[line.item_id] = (units + line.quantity, revenue + line.total)
-        return sold
-
     def export_csv(self, directory: str | Path) -> list[Path]:
         self._require_configured()
-        directory = Path(directory)
-        directory.mkdir(parents=True, exist_ok=True)
-        sales_path = directory / "sales.csv"
-        items_path = directory / "items.csv"
-        report_path = directory / f"stocks-{self._settings.device_name}.csv"
-        sales = self._persistence.get_sales()
-
-        with open(sales_path, "w", newline="", encoding="utf-8") as handle:
-            writer = csv.writer(handle)
-            writer.writerow(
-                ["device", "sale_seq", "created_at", "updated_at", "status",
-                 "total", "cash", "octopus", "voucher"]
-            )
-            for sale in sales:
-                writer.writerow(
-                    [
-                        sale.device_name,
-                        sale.seq,
-                        sale.created_at.isoformat(),
-                        sale.updated_at.isoformat(),
-                        sale.status,
-                        str(sale.total),
-                        str(sale.tender_sum(CASH)),
-                        str(sale.tender_sum(OCTOPUS)),
-                        str(sale.tender_sum(VOUCHER)),
-                    ]
-                )
-
-        with open(items_path, "w", newline="", encoding="utf-8") as handle:
-            writer = csv.writer(handle)
-            writer.writerow(["device", "sale_seq", "status", "item", "quantity", "price"])
-            for sale in sales:
-                for line in sale.line_items:
-                    writer.writerow(
-                        [
-                            sale.device_name,
-                            sale.seq,
-                            sale.status,
-                            line.item_name,
-                            line.quantity,
-                            str(line.price),
-                        ]
-                    )
-
-        with open(report_path, "w", newline="", encoding="utf-8") as handle:
-            writer = csv.writer(handle)
-            writer.writerow(catalog_module.STOCK_SHEET_HEADER)
-            sold = self._sold_and_revenue_by_item()
-            for item in self._settings.catalog:
-                units, revenue = sold.get(item.item_id, (0, Decimal("0")))
-                if item.raw_cells is not None:
-                    passthrough = list(item.raw_cells)
-                else:
-                    inventory = (
-                        str(item.starting_quantity)
-                        if item.starting_quantity is not None
-                        else ""
-                    )
-                    passthrough = [item.item_id, item.name, str(item.price), inventory]
-                writer.writerow(passthrough + [str(units), str(revenue)])
-
+        paths = reporting.write_export(
+            directory=directory,
+            sales=self._persistence.get_sales(),
+            catalog=self._settings.catalog,
+            source_cells=self._settings.source_cells,
+            device_name=self._settings.device_name,
+        )
         self._settings.last_export_at = self._now()
         self._save_settings()
-        return [sales_path, items_path, report_path]
+        return paths
 
     # -- wipe ---------------------------------------------------------------
 

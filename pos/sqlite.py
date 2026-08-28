@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS catalog (
     price             TEXT NOT NULL,
     starting_quantity INTEGER,
     sold_out          INTEGER NOT NULL DEFAULT 0,
-    raw_cells         TEXT
+    source_cells      TEXT
 );
 CREATE TABLE IF NOT EXISTS sales (
     seq         INTEGER PRIMARY KEY,
@@ -108,12 +108,24 @@ class SqlitePersistence:
         self._conn.commit()
 
     def _migrate(self) -> None:
-        """Bring pre-raw_cells device databases up to the current schema."""
+        """Bring older device databases up to the current schema.
+
+        Adds the source_cells column for databases written before the Stock
+        sheet module owned source-cell preservation, backfills it from the
+        legacy raw_cells column when present, and drops that legacy column.
+        """
         columns = {
             row["name"] for row in self._conn.execute("PRAGMA table_info(catalog)")
         }
-        if "raw_cells" not in columns:
-            self._conn.execute("ALTER TABLE catalog ADD COLUMN raw_cells TEXT")
+        if "source_cells" not in columns:
+            self._conn.execute("ALTER TABLE catalog ADD COLUMN source_cells TEXT")
+            if "raw_cells" in columns:
+                self._conn.execute(
+                    "UPDATE catalog SET source_cells = raw_cells"
+                    " WHERE source_cells IS NULL AND raw_cells IS NOT NULL"
+                )
+        if "raw_cells" in columns:
+            self._conn.execute("ALTER TABLE catalog DROP COLUMN raw_cells")
 
     def close(self) -> None:
         self._conn.close()
@@ -134,8 +146,8 @@ class SqlitePersistence:
                 settings.last_export_at = _parse_dt(row["value"])
                 found = True
         rows = self._conn.execute(
-            "SELECT item_id, name, price, starting_quantity, sold_out, raw_cells"
-            " FROM catalog"
+            "SELECT item_id, name, price, starting_quantity, sold_out,"
+            " source_cells FROM catalog"
         ).fetchall()
         if not rows and not found:
             return None
@@ -146,14 +158,14 @@ class SqlitePersistence:
                 price=money(row["price"]),
                 starting_quantity=row["starting_quantity"],
                 sold_out=bool(row["sold_out"]),
-                raw_cells=(
-                    tuple(json.loads(row["raw_cells"]))
-                    if row["raw_cells"] is not None
-                    else None
-                ),
             )
             for row in rows
         ]
+        settings.source_cells = {
+            row["item_id"]: tuple(json.loads(row["source_cells"]))
+            for row in rows
+            if row["source_cells"] is not None
+        }
         return settings
 
     def save_settings(self, settings: Settings) -> None:
@@ -182,7 +194,8 @@ class SqlitePersistence:
             )
             self._conn.execute("DELETE FROM catalog")
             self._conn.executemany(
-                "INSERT INTO catalog (item_id, name, price, starting_quantity, sold_out, raw_cells)"
+                "INSERT INTO catalog (item_id, name, price, starting_quantity,"
+                " sold_out, source_cells)"
                 " VALUES (?, ?, ?, ?, ?, ?)",
                 [
                     (
@@ -191,8 +204,9 @@ class SqlitePersistence:
                         str(item.price),
                         item.starting_quantity,
                         1 if item.sold_out else 0,
-                        json.dumps(list(item.raw_cells))
-                        if item.raw_cells is not None
+                        json.dumps(list(cells))
+                        if (cells := settings.source_cells_for(item.item_id))
+                        is not None
                         else None,
                     )
                     for item in settings.catalog

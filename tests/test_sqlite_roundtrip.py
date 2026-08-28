@@ -19,7 +19,7 @@ def _read_rows(path):
         return list(csv.reader(handle))
 
 
-def test_pre_raw_cells_database_is_migrated(sqlite_store_factory, clock, tmp_path):
+def test_pre_source_cells_database_is_migrated(sqlite_store_factory, clock, tmp_path):
     legacy = tmp_path / "legacy.db"
     import sqlite3
 
@@ -56,6 +56,86 @@ def test_pre_raw_cells_database_is_migrated(sqlite_store_factory, clock, tmp_pat
     assert len(report) == 1
     rows = _read_rows(report[0])
     assert rows[1] == ["MUG", "Mug", "60", "20", "0", "0"]
+    store.close()
+
+
+def test_legacy_raw_cells_are_backfilled_into_source_cells(
+    sqlite_store_factory, clock, tmp_path
+):
+    legacy = tmp_path / "legacy.db"
+    import sqlite3
+
+    conn = sqlite3.connect(legacy)
+    conn.executescript(
+        """
+        CREATE TABLE settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+        CREATE TABLE catalog (
+            item_id           TEXT PRIMARY KEY,
+            name              TEXT NOT NULL,
+            price             TEXT NOT NULL,
+            starting_quantity INTEGER,
+            sold_out          INTEGER NOT NULL DEFAULT 0,
+            raw_cells         TEXT
+        );
+        """
+    )
+    conn.execute(
+        "INSERT INTO catalog (item_id, name, price, starting_quantity, sold_out, raw_cells)"
+        " VALUES ('MUG', 'Mug', '60', 20, 0, '[\"MUG\", \"  Mug  \", \"60.00\", \"020\"]')"
+    )
+    conn.commit()
+    conn.close()
+
+    from pos.facade import PosSession
+    from pos.sqlite import SqlitePersistence
+
+    store = SqlitePersistence(legacy)
+    session = PosSession(store, clock=clock)
+    session.set_device_name("Till A")
+    session.set_float(500)
+    report = [p for p in session.export_csv(tmp_path) if p.name.startswith("stocks-")]
+    assert len(report) == 1
+    rows = _read_rows(report[0])
+    assert rows[1] == ["MUG", "  Mug  ", "60.00", "020", "0", "0"]
+    store.close()
+
+
+def test_legacy_raw_cells_column_is_dropped_after_migration(tmp_path):
+    legacy = tmp_path / "legacy.db"
+    import sqlite3
+
+    conn = sqlite3.connect(legacy)
+    conn.executescript(
+        """
+        CREATE TABLE settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+        CREATE TABLE catalog (
+            item_id           TEXT PRIMARY KEY,
+            name              TEXT NOT NULL,
+            price             TEXT NOT NULL,
+            starting_quantity INTEGER,
+            sold_out          INTEGER NOT NULL DEFAULT 0,
+            raw_cells         TEXT
+        );
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    from pos.sqlite import SqlitePersistence
+
+    store = SqlitePersistence(legacy)
+    columns = {
+        row["name"]
+        for row in store._conn.execute("PRAGMA table_info(catalog)")
+    }
+    assert "raw_cells" not in columns
+    assert "source_cells" in columns
     store.close()
 
 

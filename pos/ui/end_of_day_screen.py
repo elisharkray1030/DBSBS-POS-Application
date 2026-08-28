@@ -52,9 +52,8 @@ class EndOfDayScreen(ctk.CTkFrame):
             self, ("item", "count"), ("Item", "Sold"), height=5
         )
         sold.pack(fill="x", padx=16, pady=(0, 6))
-        name_by_id = {i.item_id: i.name for i in self.session.list_items()}
-        for item_id, count in figures.sold_counts.items():
-            sold.insert("", "end", values=(name_by_id.get(item_id, item_id), count))
+        for row in figures.sold_rows:
+            sold.insert("", "end", values=(row.item_name, row.count))
 
         self._section(self, "Voids").pack(fill="x", padx=16, pady=(4, 2))
         voids = style.make_table(

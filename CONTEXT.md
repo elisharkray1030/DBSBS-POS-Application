@@ -48,6 +48,10 @@ _Avoid_: Menu, product list
 The organizer's master CSV listing every item, with columns `ItemID, ItemName, Price, Inventory, Sales, Revenue`. Loaded into the app as the catalog before the event; at the end of the day each device writes out a new report file with the same columns, filling only its own Sales and Revenue (the source file is left untouched), and the organizer combines the two devices' reports by hand.
 _Avoid_: Stocks file, stock list
 
+**Source cells**:
+The four cells `ItemID, ItemName, Price, Inventory` of a Stock sheet row exactly as the organizer's file delivered them, before any stripping or parsing. Written back unchanged on the Stock sheet report so the round-trip is lossless.
+_Avoid_: Raw cells, original cells
+
 **Device**:
 One of the two Windows laptops the stall operates on event day. Each device is used by a single cashier at a time and has its own copy of the catalog. The devices have no network between them.
 _Avoid_: Machine, register, terminal
@@ -68,6 +72,10 @@ _Avoid_: Cancel, delete, refund
 The count of an item the stall began the event with, taken from the Inventory column of the Stock sheet. The basis for the end-of-event stock check.
 _Avoid_: Stock level, inventory
 
+**Items sold**:
+The per-item count of units sold on a device, in final state and excluding voids. Shown on the end-of-day screen and written into the Stock sheet report's Sales column.
+_Avoid_: Sold count, units moved
+
 **Expected cash**:
 The amount the till should hold at a given moment: the float plus all cash sales on that device, plus any cash added mid-day, minus any cash removed mid-day. Compared against the physically counted cash.
 _Avoid_: Cash count, till total
@@ -83,6 +91,10 @@ _Avoid_: Report, sync, sales file
 **Device name**:
 A short label given to a device at setup (e.g. "Till A"). Stamped on every sale that device records and carried into its sales export, so the two devices' exports can be told apart.
 _Avoid_: Till label, register id
+
+**End-of-day**:
+The per-device reconciliation figures produced at the close of the event: expected cash, Octopus and voucher totals, per-item sold counts, the voids list, and the cash adjustments. Shown on the end-of-day screen and written to the sales export. Computed per device, never merged in-app.
+_Avoid_: End of event, closing figures
 
 **Split settlement**:
 A sale paid by more than one payment method. Cash and vouchers may be combined freely, but Octopus always settles the full amount on its own.

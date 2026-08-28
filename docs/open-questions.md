@@ -2,7 +2,7 @@
 
 All previously-open decisions were resolved with the stall's organizer on
 2026-08-15. They are recorded here for history; the canonical spec
-(`.scratch/dbsbs-pos/spec.md`) carries the final policy.
+(GitHub issue #32) carries the final policy.
 
 ## Vouchers
 
@@ -18,7 +18,7 @@ All previously-open decisions were resolved with the stall's organizer on
 ## CSV catalog
 
 > Note: superseded on 2026-08-15 by the Stock sheet round-trip
-> (`docs/adr/0003-stock-sheet-round-trip.md`, `.scratch/stock-sheet/spec.md`).
+> (`docs/adr/0003-stock-sheet-round-trip.md`, GitHub issue #33).
 > The catalog is now the organizer's Stock sheet CSV
 > (`ItemID, ItemName, Price, Inventory, Sales, Revenue`); the old
 > `Name, Price, Quantity` format is no longer accepted. Kept below as history.
