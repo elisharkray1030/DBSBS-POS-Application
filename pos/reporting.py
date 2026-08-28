@@ -56,7 +56,9 @@ class EndOfDay:
     """Per-device end-of-day reconciliation figures (CONTEXT.md: End-of-day).
 
     `sold_rows` is the ordered, presentation-ready `ItemSoldRow` list — the one
-    representation of items sold, replacing the old `sold_counts` dict.
+    representation of items sold, replacing the old `sold_counts` dict. Rows
+    follow catalog order; a sold item absent from the catalog is appended with
+    its item ID as the display name so no sold item is dropped.
     """
 
     expected_cash: Money
@@ -99,7 +101,9 @@ def build_end_of_day(
 
     Expected cash is the float plus cash sales plus cash adjustments. Octopus
     and voucher totals cover only completed, final-state sales. Sold rows are
-    the non-void per-item counts in catalog order, names resolved.
+    the non-void per-item counts in catalog order with catalog names; a sold
+    item absent from the catalog is appended with its item ID as the display
+    name, so the figures never drop an item the aggregation reports.
     """
     completed = [s for s in sales if s.status == COMPLETED]
     cash = sum((s.tender_sum(CASH) for s in completed), Decimal("0"))
@@ -113,6 +117,8 @@ def build_end_of_day(
     ]
     catalog_ids = {item.item_id for item in catalog}
     for item_id, (units, _revenue) in sold_by_item.items():
+        # Fallback for a sold item absent from the catalog (only reachable if
+        # the catalog changes mid-event): keep the row, keyed by its item ID.
         if units and item_id not in catalog_ids:
             sold_rows.append(
                 ItemSoldRow(item_id=item_id, item_name=item_id, count=units)
