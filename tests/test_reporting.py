@@ -165,6 +165,26 @@ def test_end_of_day_sold_rows_in_catalog_order_with_names():
     ]
 
 
+def test_end_of_day_sold_rows_fall_back_for_items_missing_from_catalog():
+    sales = [
+        _sale(
+            1,
+            [("BDG", "Badge", 1, "15")],
+            [Tender(CASH, Decimal("15"), tendered=Decimal("15"))],
+        ),
+        _sale(
+            2,
+            [("KEYCHAIN", "Keychain", 1, "10")],
+            [Tender(CASH, Decimal("10"), tendered=Decimal("10"))],
+        ),
+    ]
+    figures = reporting.build_end_of_day(Decimal("500"), sales, [], CATALOG)
+    assert figures.sold_rows == [
+        reporting.ItemSoldRow(item_id="BDG", item_name="Badge", count=1),
+        reporting.ItemSoldRow(item_id="KEYCHAIN", item_name="KEYCHAIN", count=1),
+    ]
+
+
 def test_end_of_day_voids_list():
     voided = _sale(
         1,

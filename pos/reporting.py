@@ -111,6 +111,12 @@ def build_end_of_day(
         for item in catalog
         if (units := sold_by_item.get(item.item_id, (0, Decimal("0")))[0]) > 0
     ]
+    catalog_ids = {item.item_id for item in catalog}
+    for item_id, (units, _revenue) in sold_by_item.items():
+        if units and item_id not in catalog_ids:
+            sold_rows.append(
+                ItemSoldRow(item_id=item_id, item_name=item_id, count=units)
+            )
     adjustment_sum = sum((a.amount for a in adjustments), Decimal("0"))
     return EndOfDay(
         expected_cash=float_amount + cash + adjustment_sum,
