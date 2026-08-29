@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
-from .domain import CatalogError, Item, money
+from .domain import CatalogError, Item, SourceCells, money
 
 STOCK_SHEET_HEADER = [
     "ItemID",
@@ -30,10 +30,6 @@ STOCK_SHEET_HEADER = [
 ]
 
 _HEADER_LOWER = [cell.lower() for cell in STOCK_SHEET_HEADER]
-
-# The four source cells (ItemID, ItemName, Price, Inventory) exactly as the
-# master file delivered them, before any stripping or parsing.
-SourceCells = tuple[str, str, str, str]
 
 
 @dataclass(frozen=True)

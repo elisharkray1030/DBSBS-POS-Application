@@ -29,6 +29,7 @@ from .domain import (
     Money,
     PosError,
     Sale,
+    SourceCells,
 )
 
 SALES_HEADER = [
@@ -178,7 +179,7 @@ def item_rows(sales: list[Sale]) -> list[list[str]]:
 def stock_sheet_rows(
     catalog: list[Item],
     sold_by_item: dict[str, tuple[int, Money]],
-    source_cells: dict[str, stock_sheet.SourceCells],
+    source_cells: dict[str, SourceCells],
 ) -> list[list[str]]:
     """The six-column Stock sheet report rows, header first.
 
@@ -197,7 +198,7 @@ def write_export(
     directory: str | Path,
     sales: list[Sale],
     catalog: list[Item],
-    source_cells: dict[str, stock_sheet.SourceCells],
+    source_cells: dict[str, SourceCells],
     device_name: str,
 ) -> list[Path]:
     """Write the three export files atomically and return their paths.

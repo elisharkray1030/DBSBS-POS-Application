@@ -2,136 +2,59 @@
 
 One file per device. Every mutation is committed in its own transaction so a
 completed sale is on disk the instant it is made (survives a crash).
+
+The adapter owns the connection and the transactions; the schema and migration
+live in the schema owner and the durable-record conversion in the conversion
+owner (architecture umbrella U3).
 """
 
 from __future__ import annotations
 
-import json
 import sqlite3
-from datetime import datetime
+from functools import wraps
 from pathlib import Path
 
-from .domain import (
-    CashAdjustment,
-    Item,
-    LineItem,
-    Sale,
-    Settings,
-    Tender,
-    money,
-)
+from . import sqlite_records, sqlite_schema
+from .domain import CashAdjustment, PersistenceError, Sale, Settings
 
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS settings (
-    key   TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS catalog (
-    item_id           TEXT PRIMARY KEY,
-    name              TEXT NOT NULL,
-    price             TEXT NOT NULL,
-    starting_quantity INTEGER,
-    sold_out          INTEGER NOT NULL DEFAULT 0,
-    source_cells      TEXT
-);
-CREATE TABLE IF NOT EXISTS sales (
-    seq         INTEGER PRIMARY KEY,
-    status      TEXT NOT NULL,
-    created_at  TEXT NOT NULL,
-    updated_at  TEXT NOT NULL,
-    device_name TEXT NOT NULL,
-    total       TEXT NOT NULL,
-    cash        TEXT NOT NULL,
-    octopus     TEXT NOT NULL,
-    voucher     TEXT NOT NULL,
-    line_items  TEXT NOT NULL,
-    tenders     TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS cash_adjustments (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    amount     TEXT NOT NULL,
-    reason     TEXT NOT NULL,
-    created_at TEXT NOT NULL
-);
-"""
+_STORE = "device database"
 
 
-def _iso(value: datetime) -> str:
-    return value.isoformat()
+def _guard(fn):
+    """Translate raw database errors into domain errors.
 
+    Corruption errors pass through untouched: they are raised by the record
+    conversion, not by the database.
+    """
 
-def _parse_dt(value: str) -> datetime:
-    return datetime.fromisoformat(value)
+    @wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return fn(self, *args, **kwargs)
+        except sqlite3.Error as exc:
+            raise PersistenceError(f"{_STORE} {fn.__name__}: {exc}") from exc
 
-
-def _line_item_to_dict(line: LineItem) -> dict:
-    return {
-        "item_id": line.item_id,
-        "item_name": line.item_name,
-        "quantity": line.quantity,
-        "price": str(line.price),
-    }
-
-
-def _line_item_from_dict(data: dict) -> LineItem:
-    return LineItem(
-        item_id=data.get("item_id", ""),
-        item_name=data["item_name"],
-        quantity=int(data["quantity"]),
-        price=money(data["price"]),
-    )
-
-
-def _tender_to_dict(tender: Tender) -> dict:
-    return {
-        "method": tender.method,
-        "amount": str(tender.amount),
-        "tendered": str(tender.tendered) if tender.tendered is not None else None,
-    }
-
-
-def _tender_from_dict(data: dict) -> Tender:
-    tendered = money(data["tendered"]) if data.get("tendered") is not None else None
-    return Tender(
-        method=data["method"],
-        amount=money(data["amount"]),
-        tendered=tendered,
-    )
+    return wrapper
 
 
 class SqlitePersistence:
     def __init__(self, db_path: str | Path) -> None:
-        self._conn = sqlite3.connect(str(db_path))
-        self._conn.row_factory = sqlite3.Row
-        self._conn.executescript(_SCHEMA)
-        self._migrate()
-        self._conn.commit()
-
-    def _migrate(self) -> None:
-        """Bring older device databases up to the current schema.
-
-        Adds the source_cells column for databases written before the Stock
-        sheet module owned source-cell preservation, backfills it from the
-        legacy raw_cells column when present, and drops that legacy column.
-        """
-        columns = {
-            row["name"] for row in self._conn.execute("PRAGMA table_info(catalog)")
-        }
-        if "source_cells" not in columns:
-            self._conn.execute("ALTER TABLE catalog ADD COLUMN source_cells TEXT")
-            if "raw_cells" in columns:
-                self._conn.execute(
-                    "UPDATE catalog SET source_cells = raw_cells"
-                    " WHERE source_cells IS NULL AND raw_cells IS NOT NULL"
-                )
-        if "raw_cells" in columns:
-            self._conn.execute("ALTER TABLE catalog DROP COLUMN raw_cells")
+        try:
+            self._conn = sqlite3.connect(str(db_path))
+            self._conn.row_factory = sqlite3.Row
+            sqlite_schema.ensure_schema(self._conn)
+            self._conn.commit()
+        except sqlite3.Error as exc:
+            raise PersistenceError(
+                f"Could not open the {_STORE}: {exc}"
+            ) from exc
 
     def close(self) -> None:
         self._conn.close()
 
     # -- settings / catalog -------------------------------------------------
 
+    @_guard
     def load_settings(self) -> Settings | None:
         settings = Settings()
         found = False
@@ -140,10 +63,14 @@ class SqlitePersistence:
                 settings.device_name = row["value"]
                 found = True
             elif row["key"] == "float":
-                settings.float_amount = money(row["value"])
+                settings.float_amount = sqlite_records.parse_money(
+                    row["value"], "Settings (float)"
+                )
                 found = True
             elif row["key"] == "last_export_at" and row["value"]:
-                settings.last_export_at = _parse_dt(row["value"])
+                settings.last_export_at = sqlite_records.parse_dt(
+                    row["value"], "Settings (last_export_at)"
+                )
                 found = True
         rows = self._conn.execute(
             "SELECT item_id, name, price, starting_quantity, sold_out,"
@@ -151,23 +78,15 @@ class SqlitePersistence:
         ).fetchall()
         if not rows and not found:
             return None
-        settings.catalog = [
-            Item(
-                item_id=row["item_id"],
-                name=row["name"],
-                price=money(row["price"]),
-                starting_quantity=row["starting_quantity"],
-                sold_out=bool(row["sold_out"]),
-            )
-            for row in rows
-        ]
+        settings.catalog = [sqlite_records.item_from_row(row) for row in rows]
         settings.source_cells = {
-            row["item_id"]: tuple(json.loads(row["source_cells"]))
+            row["item_id"]: sqlite_records.source_cells_from_row(row)
             for row in rows
             if row["source_cells"] is not None
         }
         return settings
 
+    @_guard
     def save_settings(self, settings: Settings) -> None:
         with self._conn:
             self._conn.execute(
@@ -184,7 +103,7 @@ class SqlitePersistence:
                 ("float", float_value),
             )
             export_value = (
-                _iso(settings.last_export_at)
+                sqlite_records.iso(settings.last_export_at)
                 if settings.last_export_at is not None
                 else ""
             )
@@ -198,16 +117,8 @@ class SqlitePersistence:
                 " sold_out, source_cells)"
                 " VALUES (?, ?, ?, ?, ?, ?)",
                 [
-                    (
-                        item.item_id,
-                        item.name,
-                        str(item.price),
-                        item.starting_quantity,
-                        1 if item.sold_out else 0,
-                        json.dumps(list(cells))
-                        if (cells := settings.source_cells_for(item.item_id))
-                        is not None
-                        else None,
+                    sqlite_records.catalog_row_values(
+                        item, settings.source_cells_for(item.item_id)
                     )
                     for item in settings.catalog
                 ],
@@ -215,80 +126,52 @@ class SqlitePersistence:
 
     # -- sales --------------------------------------------------------------
 
+    @_guard
     def next_sale_sequence(self) -> int:
         row = self._conn.execute("SELECT MAX(seq) AS max_seq FROM sales").fetchone()
         return (row["max_seq"] if row["max_seq"] is not None else 0) + 1
 
+    @_guard
     def save_sale(self, sale: Sale) -> None:
         with self._conn:
             self._conn.execute(
                 "INSERT OR REPLACE INTO sales"
-                " (seq, status, created_at, updated_at, device_name, total,"
-                "  cash, octopus, voucher, line_items, tenders)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    sale.seq,
-                    sale.status,
-                    _iso(sale.created_at),
-                    _iso(sale.updated_at),
-                    sale.device_name,
-                    str(sale.total),
-                    str(sale.tender_sum("cash")),
-                    str(sale.tender_sum("octopus")),
-                    str(sale.tender_sum("voucher")),
-                    json.dumps([_line_item_to_dict(l) for l in sale.line_items]),
-                    json.dumps([_tender_to_dict(t) for t in sale.tenders]),
-                ),
+                " (seq, status, created_at, updated_at, device_name,"
+                "  line_items, tenders)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                sqlite_records.sale_to_row(sale),
             )
 
+    @_guard
     def get_sales(self) -> list[Sale]:
         rows = self._conn.execute("SELECT * FROM sales ORDER BY seq").fetchall()
-        return [self._sale_from_row(row) for row in rows]
-
-    @staticmethod
-    def _sale_from_row(row: sqlite3.Row) -> Sale:
-        line_items = [
-            _line_item_from_dict(data)
-            for data in json.loads(row["line_items"])
-        ]
-        tenders = [
-            _tender_from_dict(data) for data in json.loads(row["tenders"])
-        ]
-        return Sale(
-            seq=int(row["seq"]),
-            created_at=_parse_dt(row["created_at"]),
-            updated_at=_parse_dt(row["updated_at"]),
-            status=row["status"],
-            line_items=line_items,
-            tenders=tenders,
-            device_name=row["device_name"],
-        )
+        return [sqlite_records.sale_from_row(row) for row in rows]
 
     # -- cash adjustments ---------------------------------------------------
 
+    @_guard
     def save_cash_adjustment(self, adjustment: CashAdjustment) -> None:
         with self._conn:
             self._conn.execute(
                 "INSERT INTO cash_adjustments (amount, reason, created_at)"
                 " VALUES (?, ?, ?)",
-                (str(adjustment.amount), adjustment.reason, _iso(adjustment.created_at)),
+                (
+                    str(adjustment.amount),
+                    adjustment.reason,
+                    sqlite_records.iso(adjustment.created_at),
+                ),
             )
 
+    @_guard
     def get_cash_adjustments(self) -> list[CashAdjustment]:
         rows = self._conn.execute(
             "SELECT amount, reason, created_at FROM cash_adjustments ORDER BY id"
         ).fetchall()
-        return [
-            CashAdjustment(
-                amount=money(row["amount"]),
-                reason=row["reason"],
-                created_at=_parse_dt(row["created_at"]),
-            )
-            for row in rows
-        ]
+        return [sqlite_records.adjustment_from_row(row) for row in rows]
 
     # -- wipe ---------------------------------------------------------------
 
+    @_guard
     def wipe(self) -> None:
         with self._conn:
             self._conn.execute("DELETE FROM settings")

@@ -11,7 +11,32 @@ from decimal import Decimal
 
 import pytest
 
-from pos.domain import CASH, InvalidSettlement, PosError, Tender
+from pos.domain import CASH, InvalidSettlement, PersistenceError, PosError, Tender
+from pos.facade import PosSession
+from pos.persistence import InMemoryPersistence
+
+
+class _FailingPersistence(InMemoryPersistence):
+    """A persistence whose writes fail, for testing the failed-write retry path."""
+
+    def save_sale(self, sale):
+        raise PersistenceError("simulated write failure")
+
+
+def test_a_failed_save_keeps_the_in_progress_sale_for_retry(clock, catalog_file):
+    session = PosSession(_FailingPersistence(), clock=clock)
+    session.set_device_name("Till A")
+    session.set_float(500)
+    session.load_catalog(catalog_file)
+    session.add_item_to_sale("MUG", 2)
+    with pytest.raises(PersistenceError):
+        session.settle_current_sale(
+            [Tender(CASH, Decimal("120"), tendered=Decimal("200"))]
+        )
+    items = session.current_sale_items()
+    assert len(items) == 1
+    assert items[0].item_id == "MUG"
+    assert items[0].quantity == 2
 
 
 def test_item_list_shows_live_remaining_counts(configured_session):

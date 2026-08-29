@@ -56,6 +56,10 @@ _Avoid_: Raw cells, original cells
 One of the two Windows laptops the stall operates on event day. Each device is used by a single cashier at a time and has its own copy of the catalog. The devices have no network between them.
 _Avoid_: Machine, register, terminal
 
+**Device database**:
+The on-disk per-device store of the device's durable records — setup, catalog, sales, and cash adjustments. It survives crashes and is wiped at the end of the day once the export is taken. One per device; never shared between them.
+_Avoid_: Database, DB, local store
+
 **Float**:
 The starting change money in the till at the start of the event, excluded from the day's takings when reconciling cash.
 _Avoid_: Change, float money
