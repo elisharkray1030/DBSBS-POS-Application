@@ -1,6 +1,12 @@
 # DBS Garden Fete — Offline POS Application Plan
 
-**Team:** 3 people · **Venue:** DBS Garden Fete (1 stall) · **Devices:** 2 laptops (1 stall, same catalog) · **Payments:** cash + Octopus — but money is handled separately, outside the app · **Deadline:** 2026-10-31 · **Constraint:** $0/mo, fully offline, venue may have NO Wi-Fi · **Status:** Decision-ready — Q1/Q2/Q3/Q5/Q7 resolved; pending CSV sample (Q4) and hotspot check (Q6)
+> **SUPERSEDED.** This early planning document describes a Flask + SQLite web
+> app that was never built. The shipped product is a **CustomTkinter desktop
+> POS** for Windows. The canonical spec lives at GitHub issue #32, the domain
+> glossary at `CONTEXT.md`, decisions in `docs/adr/`, and run/deploy steps in
+> `README.md`. Kept below as history of the decision process.
+
+**Team:** 3 people · **Venue:** DBS Garden Fete (1 stall) · **Devices:** 2 laptops (1 stall, same catalog) · **Payments:** cash + Octopus — but money is handled separately, outside the app · **Deadline:** 2026-10-31 · **Constraint:** $0/mo, fully offline, venue may have NO Wi-Fi · **Status:** Superseded — see the banner above
 
 ---
 
