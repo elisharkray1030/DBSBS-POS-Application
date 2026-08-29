@@ -164,6 +164,16 @@ def configure_sold_out_tag(tree: ttk.Treeview) -> None:
     )
 
 
+def configure_editable_cursor(tree: ttk.Treeview, editable: bool) -> None:
+    """Point a text cursor at a cell that accepts in-place editing.
+
+    The minimal, unobtrusive cue that a table cell is editable; the Current
+    sale table's Qty column uses it so the affordance stays consistent with
+    the rest of the UI.
+    """
+    tree.configure(cursor="xterm" if editable else "")
+
+
 def start_appearance_watcher(root: tk.Misc, on_change) -> None:
     """Poll the OS appearance mode and re-apply table styling when it changes.
 

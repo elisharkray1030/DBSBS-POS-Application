@@ -192,10 +192,14 @@ class SaleScreen(ctk.CTkFrame):
 
     # -- inline quantity editing ------------------------------------------
 
+    def _over_qty_cell(self, event) -> bool:
+        return (
+            self.sale_tree.identify_region(event.x, event.y) == "cell"
+            and self.sale_tree.identify_column(event.x) == _QTY_COLUMN
+        )
+
     def _begin_qty_edit(self, event) -> None:
-        if self.sale_tree.identify_region(event.x, event.y) != "cell":
-            return
-        if self.sale_tree.identify_column(event.x) != _QTY_COLUMN:
+        if not self._over_qty_cell(event):
             return
         item_id = self.sale_tree.identify_row(event.y)
         if not item_id:
@@ -207,9 +211,8 @@ class SaleScreen(ctk.CTkFrame):
         bbox = self.sale_tree.bbox(item_id, "qty")
         if not bbox:
             return
-        values = self.sale_tree.item(item_id, "values")
         editor = ttk.Entry(self.sale_tree)
-        editor.insert(0, str(values[1]))
+        editor.insert(0, self.sale_tree.set(item_id, "qty"))
         editor.select_range(0, "end")
         editor.place(x=bbox[0], y=bbox[1], width=bbox[2], height=bbox[3])
         editor.bind("<Return>", lambda _e: self._commit_qty_edit(item_id, editor))
@@ -222,37 +225,34 @@ class SaleScreen(ctk.CTkFrame):
         if self._qty_editor is not editor:
             return
         text = editor.get()
-        self._qty_editor = None
-        editor.destroy()
+        self._destroy_qty_editor(editor)
         edit = parse_quantity_edit(text)
         if edit.kind == "remove":
             self.session.set_sale_quantity(item_id, 0)
+            self.refresh()
         elif edit.kind == "set":
             assert edit.quantity is not None
             try:
                 self.session.set_sale_quantity(item_id, edit.quantity)
             except PosError as exc:
                 show_error("Cannot set quantity", exc)
-        self.refresh()
+            self.refresh()
 
     def _cancel_qty_edit(self, editor: ttk.Entry) -> None:
-        if self._qty_editor is not editor:
-            return
-        self._qty_editor = None
-        editor.destroy()
+        self._destroy_qty_editor(editor)
 
     def _close_qty_editor(self) -> None:
         if self._qty_editor is not None:
-            self._qty_editor.destroy()
+            self._destroy_qty_editor(self._qty_editor)
+
+    def _destroy_qty_editor(self, editor: ttk.Entry) -> None:
+        if self._qty_editor is editor:
             self._qty_editor = None
+            editor.destroy()
 
     def _on_sale_tree_motion(self, event) -> None:
         """Signal that the Qty column is editable with a text cursor."""
-        editable = (
-            self.sale_tree.identify_region(event.x, event.y) == "cell"
-            and self.sale_tree.identify_column(event.x) == _QTY_COLUMN
-        )
-        self.sale_tree.configure(cursor="xterm" if editable else "")
+        style.configure_editable_cursor(self.sale_tree, self._over_qty_cell(event))
 
     def _remove_from_sale(self) -> None:
         item_id = self._selected_sale_item_id()

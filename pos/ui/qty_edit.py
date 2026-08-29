@@ -18,8 +18,8 @@ class QuantityEdit:
 
     `kind` is one of:
     - "remove" — drop the sale line from the Current sale
-    - "set"    — replace the line's quantity with `quantity`
-    - "revert" — leave the line unchanged (invalid input)
+    - "set"    — replace the sale line's quantity with `quantity`
+    - "revert" — leave the sale line unchanged (invalid input)
     """
 
     kind: QuantityEditKind
@@ -29,8 +29,9 @@ class QuantityEdit:
 def parse_quantity_edit(raw: str) -> QuantityEdit:
     """Decide what a committed inline edit should do from the raw text.
 
-    "0" removes the line, a positive whole number sets that quantity, and
-    empty, non-numeric, or negative input reverts (leaves the line unchanged).
+    "0" removes the sale line, a positive whole number sets that quantity,
+    and empty, non-numeric, or negative input reverts (leaves the sale line
+    unchanged).
     """
     text = raw.strip()
     if not text:
