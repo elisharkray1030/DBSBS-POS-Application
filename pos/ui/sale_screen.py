@@ -227,16 +227,15 @@ class SaleScreen(ctk.CTkFrame):
         text = editor.get()
         self._destroy_qty_editor(editor)
         edit = parse_quantity_edit(text)
-        if edit.kind == "remove":
-            self.session.set_sale_quantity(item_id, 0)
-            self.refresh()
-        elif edit.kind == "set":
-            assert edit.quantity is not None
-            try:
-                self.session.set_sale_quantity(item_id, edit.quantity)
-            except PosError as exc:
-                show_error("Cannot set quantity", exc)
-            self.refresh()
+        if edit.kind == "revert":
+            return
+        quantity = 0 if edit.kind == "remove" else edit.quantity
+        assert quantity is not None
+        try:
+            self.session.set_sale_quantity(item_id, quantity)
+        except PosError as exc:
+            show_error("Cannot set quantity", exc)
+        self.refresh()
 
     def _cancel_qty_edit(self, editor: ttk.Entry) -> None:
         self._destroy_qty_editor(editor)
