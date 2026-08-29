@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 
 import customtkinter as ctk  # type: ignore[import-untyped]
 
@@ -18,6 +18,11 @@ from .dialogs import (
     run_dialog,
     show_error,
 )
+from .qty_edit import parse_quantity_edit
+
+_QTY_COLUMNS = ("item", "qty", "total")
+_QTY_COLUMN_NAME = "qty"
+_QTY_COLUMN = f"#{_QTY_COLUMNS.index(_QTY_COLUMN_NAME) + 1}"
 
 
 class SaleScreen(ctk.CTkFrame):
@@ -85,19 +90,15 @@ class SaleScreen(ctk.CTkFrame):
         right.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
         ctk.CTkLabel(right, text="Current sale", anchor="w").pack(fill="x")
         self.sale_tree = style.make_table(
-            right, ("item", "qty", "total"), ("Item", "Qty", "Total"), height=12
+            right, _QTY_COLUMNS, ("Item", "Qty", "Total"), height=12
         )
         self.sale_tree.pack(fill="both", expand=True, pady=(4, 4))
+        self.sale_tree.bind("<Double-1>", self._begin_qty_edit)
+        self.sale_tree.bind("<Motion>", self._on_sale_tree_motion)
+        self._qty_editor: ttk.Entry | None = None
 
         sale_controls = ctk.CTkFrame(right, fg_color="transparent")
         sale_controls.pack(fill="x", pady=(0, 4))
-        self.sale_qty_var = tk.StringVar(value="1")
-        ctk.CTkEntry(
-            sale_controls, textvariable=self.sale_qty_var, width=50
-        ).pack(side="left")
-        ctk.CTkButton(
-            sale_controls, text="Set qty", width=80, command=self._set_qty
-        ).pack(side="left", padx=4)
         ctk.CTkButton(
             sale_controls, text="Remove", width=80, command=self._remove_from_sale
         ).pack(side="left", padx=4)
@@ -191,15 +192,68 @@ class SaleScreen(ctk.CTkFrame):
             return None
         return selection[0]
 
-    def _set_qty(self) -> None:
-        item_id = self._selected_sale_item_id()
-        if item_id is None:
+    # -- inline quantity editing ------------------------------------------
+
+    def _over_qty_cell(self, event) -> bool:
+        return (
+            self.sale_tree.identify_region(event.x, event.y) == "cell"
+            and self.sale_tree.identify_column(event.x) == _QTY_COLUMN
+        )
+
+    def _begin_qty_edit(self, event) -> None:
+        if not self._over_qty_cell(event):
             return
+        item_id = self.sale_tree.identify_row(event.y)
+        if not item_id:
+            return
+        self._open_qty_editor(item_id)
+
+    def _open_qty_editor(self, item_id: str) -> None:
+        self._close_qty_editor()
+        bbox = self.sale_tree.bbox(item_id, _QTY_COLUMN_NAME)
+        if not bbox:
+            return
+        editor = ttk.Entry(self.sale_tree)
+        editor.insert(0, self.sale_tree.set(item_id, _QTY_COLUMN_NAME))
+        editor.select_range(0, "end")
+        editor.place(x=bbox[0], y=bbox[1], width=bbox[2], height=bbox[3])
+        editor.bind("<Return>", lambda _e: self._commit_qty_edit(item_id, editor))
+        editor.bind("<Escape>", lambda _e: self._cancel_qty_edit(editor))
+        editor.bind("<FocusOut>", lambda _e: self._commit_qty_edit(item_id, editor))
+        self._qty_editor = editor
+        editor.focus_set()
+
+    def _commit_qty_edit(self, item_id: str, editor: ttk.Entry) -> None:
+        if self._qty_editor is not editor:
+            return
+        text = editor.get()
+        self._destroy_qty_editor(editor)
+        edit = parse_quantity_edit(text)
+        if edit.kind == "revert":
+            return
+        quantity = 0 if edit.kind == "remove" else edit.quantity
+        assert quantity is not None
         try:
-            self.session.set_sale_quantity(item_id, int(self.sale_qty_var.get()))
-        except (PosError, ValueError) as exc:
+            self.session.set_sale_quantity(item_id, quantity)
+        except PosError as exc:
             show_error("Cannot set quantity", exc)
         self.refresh()
+
+    def _cancel_qty_edit(self, editor: ttk.Entry) -> None:
+        self._destroy_qty_editor(editor)
+
+    def _close_qty_editor(self) -> None:
+        if self._qty_editor is not None:
+            self._destroy_qty_editor(self._qty_editor)
+
+    def _destroy_qty_editor(self, editor: ttk.Entry) -> None:
+        if self._qty_editor is editor:
+            self._qty_editor = None
+            editor.destroy()
+
+    def _on_sale_tree_motion(self, event) -> None:
+        """Signal that the Qty column is editable with a text cursor."""
+        style.configure_editable_cursor(self.sale_tree, self._over_qty_cell(event))
 
     def _remove_from_sale(self) -> None:
         item_id = self._selected_sale_item_id()

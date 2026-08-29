@@ -24,6 +24,14 @@ _Avoid_: SKU, code
 A single customer's purchase at the stall, made up of one or more items.
 _Avoid_: Transaction, purchase
 
+**Current sale**:
+The sale being built on a device right now, before it is settled. Distinct from a recorded **Sale**: the cashier edits the current sale freely, and only a settled sale becomes a record.
+_Avoid_: Open sale, live sale, basket
+
+**Sale line**:
+One row of a sale: an item, its quantity, and that row's total. A sale is made up of one or more sale lines; an item appears in at most one line per sale.
+_Avoid_: Line item, line, row
+
 **Cash**:
 Notes and coins handed over the counter in payment.
 _Avoid_: Money, change
