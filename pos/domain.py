@@ -26,6 +26,20 @@ class PosError(Exception):
     """Base class for domain errors."""
 
 
+class PersistenceError(PosError):
+    """A device database operation failed (CONTEXT.md: Device database)."""
+
+
+class CorruptRecordError(PersistenceError):
+    """Stored data could not be reconstructed into a domain record.
+
+    Raised when a durable record cannot be parsed — malformed JSON, unparseable
+    money or timestamps, or a structurally invalid value. The message names the
+    offending record (a sale's sequence number, an item id, or a settings key)
+    so the damage is findable instead of guessed at.
+    """
+
+
 class SetupError(PosError):
     """Raised when the session is used before it is configured."""
 
@@ -65,6 +79,11 @@ def money(value: str | Decimal | float) -> Money:
         return Decimal(text)
     except Exception as exc:
         raise CatalogError(f"Not a money value: {value!r}") from exc
+
+
+# The four source cells (ItemID, ItemName, Price, Inventory) of a Stock sheet
+# row exactly as the master file delivered them (CONTEXT.md: Source cells).
+SourceCells = tuple[str, str, str, str]
 
 
 @dataclass
@@ -181,7 +200,7 @@ class Settings:
     device_name: str = ""
     float_amount: Money | None = None
     catalog: list[Item] = field(default_factory=list)
-    source_cells: dict[str, tuple[str, str, str, str]] = field(default_factory=dict)
+    source_cells: dict[str, SourceCells] = field(default_factory=dict)
     last_export_at: datetime | None = None
 
     @property
@@ -198,7 +217,7 @@ class Settings:
                 return item
         return None
 
-    def source_cells_for(self, item_id: str) -> tuple[str, str, str, str] | None:
+    def source_cells_for(self, item_id: str) -> SourceCells | None:
         return self.source_cells.get(item_id)
 
 

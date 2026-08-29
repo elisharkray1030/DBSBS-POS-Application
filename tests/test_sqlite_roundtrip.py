@@ -1,8 +1,10 @@
-"""The one SQLite round-trip sanity test the spec allows (docs/spec.md §Testing).
+"""Facade-level tests against the real SQLite backing.
 
-Everything else is tested through the facade with InMemoryPersistence. This
-single test exercises the real SQLite backing the way the production app uses
-it, including a simulated crash (connections left open, no graceful close).
+Storage concerns live in the adapter-seam storage suite
+(test_sqlite_storage.py); this file keeps the facade-level round-trips — the
+way the production app uses the device database, including a simulated crash
+(connections left open, no graceful close) and legacy-database migration
+through the session.
 """
 
 from __future__ import annotations
@@ -100,42 +102,6 @@ def test_legacy_raw_cells_are_backfilled_into_source_cells(
     assert len(report) == 1
     rows = _read_rows(report[0])
     assert rows[1] == ["MUG", "  Mug  ", "60.00", "020", "0", "0"]
-    store.close()
-
-
-def test_legacy_raw_cells_column_is_dropped_after_migration(tmp_path):
-    legacy = tmp_path / "legacy.db"
-    import sqlite3
-
-    conn = sqlite3.connect(legacy)
-    conn.executescript(
-        """
-        CREATE TABLE settings (
-            key   TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        );
-        CREATE TABLE catalog (
-            item_id           TEXT PRIMARY KEY,
-            name              TEXT NOT NULL,
-            price             TEXT NOT NULL,
-            starting_quantity INTEGER,
-            sold_out          INTEGER NOT NULL DEFAULT 0,
-            raw_cells         TEXT
-        );
-        """
-    )
-    conn.commit()
-    conn.close()
-
-    from pos.sqlite import SqlitePersistence
-
-    store = SqlitePersistence(legacy)
-    columns = {
-        row["name"]
-        for row in store._conn.execute("PRAGMA table_info(catalog)")
-    }
-    assert "raw_cells" not in columns
-    assert "source_cells" in columns
     store.close()
 
 
