@@ -17,6 +17,7 @@ feature specs listed below.
 | CustomTkinter UI migration | #35 | `customtkinter-ui` |
 | Table header contrast fix | #36 | `table-header-contrast-fix` |
 | End-of-event reporting deepening (U2) | #29 | `end-of-event-reporting` |
+| SQLite persistence deepening (U3) | #41 | `persistence` |
 
 ## Conventions
 
