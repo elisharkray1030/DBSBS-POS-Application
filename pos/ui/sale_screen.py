@@ -92,17 +92,11 @@ class SaleScreen(ctk.CTkFrame):
         )
         self.sale_tree.pack(fill="both", expand=True, pady=(4, 4))
         self.sale_tree.bind("<Double-1>", self._begin_qty_edit)
+        self.sale_tree.bind("<Motion>", self._on_sale_tree_motion)
         self._qty_editor: ttk.Entry | None = None
 
         sale_controls = ctk.CTkFrame(right, fg_color="transparent")
         sale_controls.pack(fill="x", pady=(0, 4))
-        self.sale_qty_var = tk.StringVar(value="1")
-        ctk.CTkEntry(
-            sale_controls, textvariable=self.sale_qty_var, width=50
-        ).pack(side="left")
-        ctk.CTkButton(
-            sale_controls, text="Set qty", width=80, command=self._set_qty
-        ).pack(side="left", padx=4)
         ctk.CTkButton(
             sale_controls, text="Remove", width=80, command=self._remove_from_sale
         ).pack(side="left", padx=4)
@@ -252,15 +246,13 @@ class SaleScreen(ctk.CTkFrame):
             self._qty_editor.destroy()
             self._qty_editor = None
 
-    def _set_qty(self) -> None:
-        item_id = self._selected_sale_item_id()
-        if item_id is None:
-            return
-        try:
-            self.session.set_sale_quantity(item_id, int(self.sale_qty_var.get()))
-        except (PosError, ValueError) as exc:
-            show_error("Cannot set quantity", exc)
-        self.refresh()
+    def _on_sale_tree_motion(self, event) -> None:
+        """Signal that the Qty column is editable with a text cursor."""
+        editable = (
+            self.sale_tree.identify_region(event.x, event.y) == "cell"
+            and self.sale_tree.identify_column(event.x) == _QTY_COLUMN
+        )
+        self.sale_tree.configure(cursor="xterm" if editable else "")
 
     def _remove_from_sale(self) -> None:
         item_id = self._selected_sale_item_id()
