@@ -76,6 +76,10 @@ _Avoid_: Cancel, delete, refund
 The count of an item the stall began the event with, taken from the Inventory column of the Stock sheet. The basis for the end-of-event stock check.
 _Avoid_: Stock level, inventory
 
+**Sold out**:
+An item the stall has stopped selling, marked manually by the cashier during the event. The app never infers sold-out from the remaining quantity; only the cashier's explicit marking sets it.
+_Avoid_: Out of stock, unavailable
+
 **Items sold**:
 The per-item count of units sold on a device, in final state and excluding voids. Shown on the end-of-day screen and written into the Stock sheet report's Sales column.
 _Avoid_: Sold count, units moved

@@ -14,8 +14,11 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
+from typing import Literal
 
 import customtkinter as ctk  # type: ignore[import-untyped]
+
+TreeviewAnchor = Literal["nw", "n", "ne", "w", "center", "e", "sw", "s", "se"]
 
 # Fonts
 FONT_TITLE = ("Segoe UI", 16)
@@ -102,18 +105,54 @@ def configure_treeview_style() -> None:
 
 
 def make_table(
-    parent, columns: tuple[str, ...], headings: tuple[str, ...], height: int
+    parent,
+    columns: tuple[str, ...],
+    headings: tuple[str, ...],
+    height: int,
+    *,
+    widths: tuple[int | None, ...] | None = None,
+    anchors: tuple[TreeviewAnchor | None, ...] | None = None,
+    minwidths: tuple[int | None, ...] | None = None,
+    stretch: tuple[bool | None, ...] | None = None,
 ) -> ttk.Treeview:
-    """Build a Treeview with the app's shared styling and column headings."""
+    """Build a Treeview with the app's shared styling and column headings.
+
+    `widths`, `anchors`, `minwidths`, and `stretch` are optional tuples aligned
+    positionally with `columns`; a `None` entry leaves that column on its
+    Treeview default (content auto-sizing, left-anchored, stretching) so
+    existing callers are unchanged.
+    """
     tree = ttk.Treeview(parent, columns=columns, show="headings", height=height)
     for col, text in zip(columns, headings):
         tree.heading(col, text=text)
+    _apply_column_options(tree, columns, widths, "width")
+    _apply_column_options(tree, columns, anchors, "anchor")
+    _apply_column_options(tree, columns, minwidths, "minwidth")
+    _apply_column_options(tree, columns, stretch, "stretch")
     return tree
 
 
+def _apply_column_options(
+    tree: ttk.Treeview,
+    columns: tuple[str, ...],
+    options: tuple | None,
+    option: str,
+) -> None:
+    """Apply a per-column option, leaving columns with a `None` entry untouched."""
+    if options is None:
+        return
+    for col, value in zip(columns, options):
+        if value is not None:
+            tree.column(col, **{option: value})
+
+
 def configure_sold_out_tag(tree: ttk.Treeview) -> None:
-    """Dim sold-out rows with a color that fits the current appearance mode."""
-    tree.tag_configure("sold_out", foreground=palette()["sold_out"])
+    """Dim sold-out rows and strike them through, fitting the appearance mode."""
+    tree.tag_configure(
+        "sold_out",
+        font=_TABLE_FONT + ("overstrike",),
+        foreground=palette()["sold_out"],
+    )
 
 
 def start_appearance_watcher(root: tk.Misc, on_change) -> None:
