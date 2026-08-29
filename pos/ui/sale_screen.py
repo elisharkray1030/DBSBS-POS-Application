@@ -59,7 +59,7 @@ class SaleScreen(ctk.CTkFrame):
             left,
             ("item_id", "name", "price", "remaining"),
             ("ID", "Item", "Price", "Remaining"),
-            height=15,
+            height=15,  # rows: keeps the controls row + scrollbar visible at the 800x600 minimum
             widths=(70, None, 60, 60),
             anchors=("center", "w", "center", "center"),
             minwidths=(None, 220, None, None),
