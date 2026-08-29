@@ -19,6 +19,7 @@ class PosApp(ctk.CTk):
         self.session = session
         self.title("DBS Garden Fete POS")
         self.geometry("1000x700")
+        self.minsize(800, 600)  # floor for the item-list columns, derived from the locked layout (U4 spec #52)
         self._current = None
         style.configure_treeview_style()
         style.start_appearance_watcher(self, self._on_appearance_change)
