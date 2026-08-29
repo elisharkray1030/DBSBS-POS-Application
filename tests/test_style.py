@@ -188,6 +188,34 @@ def test_make_table_without_layout_params_keeps_treeview_defaults() -> None:
         assert column["anchor"] == "w"
 
 
+def _horizontal_scrollbars(parent) -> list[ttk.Scrollbar]:
+    return [
+        widget
+        for widget in parent.winfo_children()
+        if isinstance(widget, ttk.Scrollbar)
+        and str(widget.cget("orient")) == "horizontal"
+    ]
+
+
+def test_make_table_horizontal_scroll_wires_a_scrollbar_to_the_table() -> None:
+    with _tk_root() as root:
+        tree = style.make_table(
+            root, ITEM_COLUMNS, ITEM_HEADINGS, height=5, horizontal_scroll=True
+        )
+        bars = _horizontal_scrollbars(root)
+        assert len(bars) == 1
+        bar = bars[0]
+        assert "xview" in bar.cget("command")
+        assert "set" in tree.cget("xscrollcommand")
+
+
+def test_make_table_without_horizontal_scroll_leaves_table_plain() -> None:
+    with _tk_root() as root:
+        tree = style.make_table(root, ITEM_COLUMNS, ITEM_HEADINGS, height=5)
+        assert _horizontal_scrollbars(root) == []
+        assert tree.cget("xscrollcommand") == ""
+
+
 def test_sold_out_tag_strikes_through_and_dims() -> None:
     with _tk_root() as root:
         ctk.set_appearance_mode("light")

@@ -114,6 +114,7 @@ def make_table(
     anchors: tuple[TreeviewAnchor | None, ...] | None = None,
     minwidths: tuple[int | None, ...] | None = None,
     stretch: tuple[bool | None, ...] | None = None,
+    horizontal_scroll: bool = False,
 ) -> ttk.Treeview:
     """Build a Treeview with the app's shared styling and column headings.
 
@@ -121,6 +122,10 @@ def make_table(
     positionally with `columns`; a `None` entry leaves that column on its
     Treeview default (content auto-sizing, left-anchored, stretching) so
     existing callers are unchanged.
+
+    With `horizontal_scroll` set, a horizontal scrollbar is created below the
+    table and wired to its horizontal view. Tables that do not opt in are
+    unchanged; the scrollbar is inert when the columns fit.
     """
     tree = ttk.Treeview(parent, columns=columns, show="headings", height=height)
     for col, text in zip(columns, headings):
@@ -129,6 +134,10 @@ def make_table(
     _apply_column_options(tree, columns, anchors, "anchor")
     _apply_column_options(tree, columns, minwidths, "minwidth")
     _apply_column_options(tree, columns, stretch, "stretch")
+    if horizontal_scroll:
+        scrollbar = ttk.Scrollbar(parent, orient="horizontal", command=tree.xview)
+        tree.configure(xscrollcommand=scrollbar.set)
+        scrollbar.pack(side="bottom", fill="x")
     return tree
 
 
