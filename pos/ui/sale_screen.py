@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 
 import customtkinter as ctk  # type: ignore[import-untyped]
 
@@ -18,6 +18,9 @@ from .dialogs import (
     run_dialog,
     show_error,
 )
+from .qty_edit import parse_quantity_edit
+
+_QTY_COLUMN = "#2"  # Treeview column id of the Current sale table's Qty column
 
 
 class SaleScreen(ctk.CTkFrame):
@@ -88,6 +91,8 @@ class SaleScreen(ctk.CTkFrame):
             right, ("item", "qty", "total"), ("Item", "Qty", "Total"), height=12
         )
         self.sale_tree.pack(fill="both", expand=True, pady=(4, 4))
+        self.sale_tree.bind("<Double-1>", self._begin_qty_edit)
+        self._qty_editor: ttk.Entry | None = None
 
         sale_controls = ctk.CTkFrame(right, fg_color="transparent")
         sale_controls.pack(fill="x", pady=(0, 4))
@@ -190,6 +195,62 @@ class SaleScreen(ctk.CTkFrame):
         if not selection:
             return None
         return selection[0]
+
+    # -- inline quantity editing ------------------------------------------
+
+    def _begin_qty_edit(self, event) -> None:
+        if self.sale_tree.identify_region(event.x, event.y) != "cell":
+            return
+        if self.sale_tree.identify_column(event.x) != _QTY_COLUMN:
+            return
+        item_id = self.sale_tree.identify_row(event.y)
+        if not item_id:
+            return
+        self._open_qty_editor(item_id)
+
+    def _open_qty_editor(self, item_id: str) -> None:
+        self._close_qty_editor()
+        bbox = self.sale_tree.bbox(item_id, "qty")
+        if not bbox:
+            return
+        values = self.sale_tree.item(item_id, "values")
+        editor = ttk.Entry(self.sale_tree)
+        editor.insert(0, str(values[1]))
+        editor.select_range(0, "end")
+        editor.place(x=bbox[0], y=bbox[1], width=bbox[2], height=bbox[3])
+        editor.bind("<Return>", lambda _e: self._commit_qty_edit(item_id, editor))
+        editor.bind("<Escape>", lambda _e: self._cancel_qty_edit(editor))
+        editor.bind("<FocusOut>", lambda _e: self._commit_qty_edit(item_id, editor))
+        self._qty_editor = editor
+        editor.focus_set()
+
+    def _commit_qty_edit(self, item_id: str, editor: ttk.Entry) -> None:
+        if self._qty_editor is not editor:
+            return
+        text = editor.get()
+        self._qty_editor = None
+        editor.destroy()
+        edit = parse_quantity_edit(text)
+        if edit.kind == "remove":
+            self.session.set_sale_quantity(item_id, 0)
+        elif edit.kind == "set":
+            assert edit.quantity is not None
+            try:
+                self.session.set_sale_quantity(item_id, edit.quantity)
+            except PosError as exc:
+                show_error("Cannot set quantity", exc)
+        self.refresh()
+
+    def _cancel_qty_edit(self, editor: ttk.Entry) -> None:
+        if self._qty_editor is not editor:
+            return
+        self._qty_editor = None
+        editor.destroy()
+
+    def _close_qty_editor(self) -> None:
+        if self._qty_editor is not None:
+            self._qty_editor.destroy()
+            self._qty_editor = None
 
     def _set_qty(self) -> None:
         item_id = self._selected_sale_item_id()
