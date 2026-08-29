@@ -57,9 +57,13 @@ class SaleScreen(ctk.CTkFrame):
         ctk.CTkLabel(left, text="Items", anchor="w").pack(fill="x")
         self.item_tree = style.make_table(
             left,
-            ("item_id", "name", "price", "remaining", "status"),
-            ("ID", "Item", "Price", "Remaining", "Status"),
+            ("item_id", "name", "price", "remaining"),
+            ("ID", "Item", "Price", "Remaining"),
             height=20,
+            widths=(70, None, 60, 60),
+            anchors=("center", "w", "center", "center"),
+            minwidths=(None, 220, None, None),
+            stretch=(False, True, False, False),
         )
         self.item_tree.pack(fill="both", expand=True, pady=(4, 4))
 
@@ -125,11 +129,10 @@ class SaleScreen(ctk.CTkFrame):
         self.item_tree.delete(*self.item_tree.get_children())
         for stock in self.session.list_items():
             remaining = "—" if stock.remaining is None else str(stock.remaining)
-            status = "sold out" if stock.sold_out else ""
             self.item_tree.insert(
                 "",
                 "end",
-                values=(stock.item_id, stock.name, fmt(stock.price), remaining, status),
+                values=(stock.item_id, stock.name, fmt(stock.price), remaining),
                 tags=("sold_out",) if stock.sold_out else (),
             )
         style.configure_sold_out_tag(self.item_tree)

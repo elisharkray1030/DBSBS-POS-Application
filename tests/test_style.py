@@ -11,6 +11,8 @@ unadorned environments and runs where the app actually renders (Windows).
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 import pytest
 
 pytest.importorskip("tkinter")
@@ -20,6 +22,24 @@ import tkinter as tk
 from tkinter import ttk
 
 from pos.ui import style
+
+# The item list's column set, as it should read after the Status column goes.
+ITEM_COLUMNS = ("item_id", "name", "price", "remaining")
+ITEM_HEADINGS = ("ID", "Item", "Price", "Remaining")
+
+
+@contextmanager
+def _tk_root():
+    """A withdrawn Tk root, skipping when there is no display to render on."""
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        pytest.skip(f"No display for Tk: {exc}")
+    root.withdraw()
+    try:
+        yield root
+    finally:
+        root.destroy()
 
 # WCAG AA contrast floor for normal-size text (locked in the spec).
 AA_MIN_CONTRAST = 4.5
@@ -86,3 +106,93 @@ def test_treeview_heading_style_carries_the_palette_values(mode: str) -> None:
             assert tree_style.lookup("Treeview.Heading", "foreground") == header_fg
     finally:
         root.destroy()
+
+
+def test_make_table_applies_per_column_widths() -> None:
+    with _tk_root() as root:
+        baseline = style.make_table(
+            root, ITEM_COLUMNS, ITEM_HEADINGS, height=5
+        )
+        tree = style.make_table(
+            root,
+            ITEM_COLUMNS,
+            ITEM_HEADINGS,
+            height=5,
+            widths=(70, None, 60, 60),
+        )
+        assert tree.column("item_id")["width"] == 70
+        assert tree.column("price")["width"] == 60
+        assert tree.column("remaining")["width"] == 60
+        assert tree.column("name")["width"] == baseline.column("name")["width"]
+
+
+def test_make_table_applies_per_column_anchors() -> None:
+    with _tk_root() as root:
+        baseline = style.make_table(
+            root, ITEM_COLUMNS, ITEM_HEADINGS, height=5
+        )
+        tree = style.make_table(
+            root,
+            ITEM_COLUMNS,
+            ITEM_HEADINGS,
+            height=5,
+            anchors=("center", None, "center", "center"),
+        )
+        assert tree.column("item_id")["anchor"] == "center"
+        assert tree.column("price")["anchor"] == "center"
+        assert tree.column("remaining")["anchor"] == "center"
+        assert tree.column("name")["anchor"] == baseline.column("name")["anchor"]
+
+
+def test_make_table_applies_per_column_minimum_widths() -> None:
+    with _tk_root() as root:
+        baseline = style.make_table(
+            root, ITEM_COLUMNS, ITEM_HEADINGS, height=5
+        )
+        tree = style.make_table(
+            root,
+            ITEM_COLUMNS,
+            ITEM_HEADINGS,
+            height=5,
+            minwidths=(None, 220, None, None),
+        )
+        assert tree.column("name")["minwidth"] == 220
+        assert tree.column("item_id")["minwidth"] == baseline.column("item_id")["minwidth"]
+        assert tree.column("price")["minwidth"] == baseline.column("price")["minwidth"]
+
+
+def test_make_table_applies_per_column_stretch() -> None:
+    with _tk_root() as root:
+        tree = style.make_table(
+            root,
+            ITEM_COLUMNS,
+            ITEM_HEADINGS,
+            height=5,
+            stretch=(False, True, False, False),
+        )
+        assert tree.column("item_id")["stretch"] == 0
+        assert tree.column("price")["stretch"] == 0
+        assert tree.column("remaining")["stretch"] == 0
+        assert tree.column("name")["stretch"] == 1
+
+
+def test_make_table_without_layout_params_keeps_treeview_defaults() -> None:
+    with _tk_root() as root:
+        tree = style.make_table(
+            root, ITEM_COLUMNS, ITEM_HEADINGS, height=5
+        )
+        column = tree.column("item_id")
+        assert column["width"] == 200
+        assert column["minwidth"] == 20
+        assert column["stretch"] == 1
+        assert column["anchor"] == "w"
+
+
+def test_sold_out_tag_strikes_through_and_dims() -> None:
+    with _tk_root() as root:
+        ctk.set_appearance_mode("light")
+        tree = ttk.Treeview(root, columns=ITEM_COLUMNS, show="headings")
+        style.configure_sold_out_tag(tree)
+        tag = tree.tag_configure("sold_out")
+        assert "overstrike" in tag["font"]
+        assert tag["foreground"] == style.palette()["sold_out"]
