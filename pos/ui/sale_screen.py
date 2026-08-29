@@ -20,7 +20,9 @@ from .dialogs import (
 )
 from .qty_edit import parse_quantity_edit
 
-_QTY_COLUMN = "#2"  # Treeview column id of the Current sale table's Qty column
+_QTY_COLUMNS = ("item", "qty", "total")
+_QTY_COLUMN_NAME = "qty"
+_QTY_COLUMN = f"#{_QTY_COLUMNS.index(_QTY_COLUMN_NAME) + 1}"
 
 
 class SaleScreen(ctk.CTkFrame):
@@ -88,7 +90,7 @@ class SaleScreen(ctk.CTkFrame):
         right.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
         ctk.CTkLabel(right, text="Current sale", anchor="w").pack(fill="x")
         self.sale_tree = style.make_table(
-            right, ("item", "qty", "total"), ("Item", "Qty", "Total"), height=12
+            right, _QTY_COLUMNS, ("Item", "Qty", "Total"), height=12
         )
         self.sale_tree.pack(fill="both", expand=True, pady=(4, 4))
         self.sale_tree.bind("<Double-1>", self._begin_qty_edit)
@@ -208,11 +210,11 @@ class SaleScreen(ctk.CTkFrame):
 
     def _open_qty_editor(self, item_id: str) -> None:
         self._close_qty_editor()
-        bbox = self.sale_tree.bbox(item_id, "qty")
+        bbox = self.sale_tree.bbox(item_id, _QTY_COLUMN_NAME)
         if not bbox:
             return
         editor = ttk.Entry(self.sale_tree)
-        editor.insert(0, self.sale_tree.set(item_id, "qty"))
+        editor.insert(0, self.sale_tree.set(item_id, _QTY_COLUMN_NAME))
         editor.select_range(0, "end")
         editor.place(x=bbox[0], y=bbox[1], width=bbox[2], height=bbox[3])
         editor.bind("<Return>", lambda _e: self._commit_qty_edit(item_id, editor))
