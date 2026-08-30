@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from datetime import datetime
+from decimal import Decimal
 
 from .domain import (
     CASH,
@@ -21,12 +22,15 @@ from .domain import (
     CashAdjustment,
     CorruptRecordError,
     InvalidMoney,
+    InvalidSettlement,
     Item,
     LineItem,
+    Money,
     Sale,
     SourceCells,
     Tender,
     money,
+    validate_settlement,
 )
 
 
@@ -60,6 +64,40 @@ def parse_money(value: str, where: str):
         raise CorruptRecordError(f"{where}: bad money value {value!r}") from exc
 
 
+def parse_float(value: str, where: str) -> Money | None:
+    """The stored Float: empty reads as unset, otherwise finite nonnegative."""
+    if not value:
+        return None
+    parsed = parse_money(value, where)
+    if parsed < 0:
+        raise CorruptRecordError(f"{where}: negative float {value!r}")
+    return parsed
+
+
+def parse_device_name(value: str, where: str) -> str:
+    """A stored settings device name must be usable non-empty text.
+
+    An empty stored value represents a setup that never named the device; a
+    present-but-empty (whitespace-only) value is corruption.
+    """
+    if not isinstance(value, str) or not value.strip():
+        raise CorruptRecordError(f"{where}: corrupt device name {value!r}")
+    return value
+
+
+def _require_whole_quantity(value, where: str) -> int:
+    """A stored sale-line quantity must be a strict whole number.
+
+    `int()` is never used on the stored value: a fractional or non-integer
+    JSON number would otherwise be silently truncated or coerced.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise CorruptRecordError(f"{where}: corrupt quantity {value!r}")
+    if value < 1:
+        raise CorruptRecordError(f"{where}: corrupt quantity {value!r}")
+    return value
+
+
 def line_item_to_dict(line: LineItem) -> dict:
     return {
         "item_id": line.item_id,
@@ -73,12 +111,15 @@ def line_item_from_dict(data: dict, where: str) -> LineItem:
     try:
         item_id = data["item_id"]
         item_name = data["item_name"]
-        quantity = int(data["quantity"])
+        quantity = data["quantity"]
         price = parse_money(data["price"], where)
     except (KeyError, TypeError, ValueError) as exc:
         raise CorruptRecordError(f"{where}: corrupt line item ({exc})") from exc
     item_id = _require_text(item_id, where, "item id")
     item_name = _require_text(item_name, where, "item name")
+    quantity = _require_whole_quantity(quantity, where)
+    if price < 0:
+        raise CorruptRecordError(f"{where}: negative line price {price!r}")
     return LineItem(item_id=item_id, item_name=item_name, quantity=quantity, price=price)
 
 
@@ -146,6 +187,11 @@ def sale_from_row(row: sqlite3.Row) -> Sale:
     if status not in (COMPLETED, VOIDED):
         raise CorruptRecordError(f"{where}: unknown sale status {status!r}")
     device_name = _require_text(device_name, where, "device name")
+    total = sum((line.total for line in line_items), Decimal("0"))
+    try:
+        validate_settlement(tenders, total)
+    except InvalidSettlement as exc:
+        raise CorruptRecordError(f"{where}: invalid settlement ({exc})") from exc
     return Sale(
         seq=seq,
         created_at=created_at,
@@ -166,13 +212,20 @@ def item_from_row(row: sqlite3.Row) -> Item:
         starting_quantity = _require_int(
             starting_quantity, where, "starting quantity"
         )
+        if starting_quantity < 0:
+            raise CorruptRecordError(
+                f"{where}: negative starting quantity {starting_quantity!r}"
+            )
     sold_out = _require_int(row["sold_out"], where, "sold-out flag")
     if sold_out not in (0, 1):
         raise CorruptRecordError(f"{where}: corrupt sold-out flag {sold_out!r}")
+    price = parse_money(row["price"], where)
+    if price < 0:
+        raise CorruptRecordError(f"{where}: negative price {price!r}")
     return Item(
         item_id=item_id,
         name=name,
-        price=parse_money(row["price"], where),
+        price=price,
         starting_quantity=starting_quantity,
         sold_out=bool(sold_out),
     )

@@ -105,6 +105,29 @@ def test_legacy_raw_cells_are_backfilled_into_source_cells(
     store.close()
 
 
+def test_interrupted_setup_resumes_at_the_setup_screen(
+    sqlite_store_factory, clock, catalog_file, tmp_path
+):
+    """A device that loaded only the catalog reopens as unconfigured, not corrupt."""
+    store = sqlite_store_factory()
+    first = PosSession(store, clock=clock)
+    first.load_catalog(catalog_file)
+
+    reopened_store = sqlite_store_factory()
+    reopened = PosSession(reopened_store, clock=clock)
+    assert reopened.is_configured() is False
+    assert [i.item_id for i in reopened.list_items()] == ["MUG", "BDG", "PLUSH"]
+
+    reopened.set_device_name("Till A")
+    reopened.set_float(500)
+    assert reopened.is_configured() is True
+    reopened.add_item_to_sale("MUG", 1)
+    reopened.settle_current_sale(
+        [Tender(CASH, Decimal("60"), tendered=Decimal("60"))]
+    )
+    assert reopened.get_sale(1).seq == 1
+
+
 def test_sqlite_backing_round_trips_and_wipe(
     sqlite_store_factory, clock, catalog_file, tmp_path
 ):

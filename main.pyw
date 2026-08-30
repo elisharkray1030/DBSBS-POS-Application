@@ -19,7 +19,6 @@ from pos.domain import CorruptRecordError, PosError
 from pos.facade import PosSession
 from pos.fatal import fatal_error
 from pos.sqlite import SqlitePersistence
-from pos.ui.app import PosApp
 
 
 def main() -> None:
@@ -27,6 +26,10 @@ def main() -> None:
     diagnostics.set_log_dir(app_dir)
     db_path = app_dir / "pos.db"
     try:
+        # The app shell pulls in customtkinter; imported inside the guard so a
+        # broken dependency surfaces through the fatal dialog, not silently.
+        from pos.ui.app import PosApp
+
         session = PosSession(SqlitePersistence(db_path))
         app = PosApp(session)
         app.mainloop()

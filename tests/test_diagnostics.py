@@ -68,6 +68,59 @@ def test_log_failure_never_raises(tmp_path: Path) -> None:
     diagnostics.log_failure(LogSource.EXPORT, "boom", base_dir=blocking)
 
 
+def test_oversized_detail_keeps_identity_and_truncates_detail(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(diagnostics, "MAX_LOG_BYTES", 512)
+    diagnostics.log_failure(
+        LogSource.BOOTSTRAP,
+        "install failed",
+        detail="x" * 20000,
+        base_dir=tmp_path,
+    )
+
+    text = diagnostics.log_path(tmp_path).read_text(encoding="utf-8")
+    assert "[bootstrap] install failed" in text
+    assert "detail: " in text
+    assert "x" * 20000 not in text
+    assert len(text.encode("utf-8")) <= 512
+
+
+def test_oversized_primary_message_keeps_timestamp_and_operation(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(diagnostics, "MAX_LOG_BYTES", 512)
+    diagnostics.log_failure(
+        LogSource.SETTLEMENT, "m" * 20000, base_dir=tmp_path
+    )
+
+    text = diagnostics.log_path(tmp_path).read_text(encoding="utf-8")
+    assert re.search(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2} \[settlement\]", text)
+    assert "m" * 20000 not in text
+    assert len(text.encode("utf-8")) <= 512
+
+
+def test_huge_pip_output_is_capped_as_detail(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(diagnostics, "MAX_LOG_BYTES", 512)
+    pip_output = "Collecting customtkinter\n" + "warn " * 10000
+    diagnostics.log_failure(
+        LogSource.BOOTSTRAP, "install failed", detail=pip_output, base_dir=tmp_path
+    )
+
+    text = diagnostics.log_path(tmp_path).read_text(encoding="utf-8")
+    assert "[bootstrap] install failed" in text
+    assert len(text.encode("utf-8")) <= 512
+
+
+def test_unencodable_message_does_not_raise_or_break_the_log(tmp_path: Path) -> None:
+    diagnostics.log_failure(
+        LogSource.APP, "bad name: Mug\ud800", base_dir=tmp_path
+    )
+
+    text = diagnostics.log_path(tmp_path).read_text(encoding="utf-8")
+    assert "[app]" in text
+
+
 def test_configured_default_location(tmp_path: Path) -> None:
     original = diagnostics.log_dir()
     diagnostics.set_log_dir(tmp_path)

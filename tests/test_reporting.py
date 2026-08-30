@@ -406,6 +406,77 @@ def test_write_export_succeeds_for_the_longest_valid_device_name(tmp_path):
     assert paths[-1].exists()
 
 
+# -- encoding and non-OSError writer failures (spec #81, ticket 07) --------
+
+
+def test_encoding_failure_maps_to_export_error_and_cleans_up_temps(tmp_path):
+    sales = [
+        _sale(
+            1,
+            [("MUG", "Mug\ud800", 1, "60")],
+            [Tender(CASH, Decimal("60"), tendered=Decimal("60"))],
+        )
+    ]
+    dest = tmp_path / "export"
+    dest.mkdir()
+
+    with pytest.raises(ExportError):
+        reporting.write_export(
+            dest, sales, CATALOG, {"MUG": ("MUG", "Mug\ud800", "60", "20")}, "Till A"
+        )
+    assert list(dest.iterdir()) == []  # no temp files survive the failure
+
+
+def test_non_oserror_writer_failure_maps_to_export_error_and_cleans_up_temps(
+    tmp_path, monkeypatch
+):
+    sales = [
+        _sale(
+            1,
+            [("MUG", "Mug", 1, "60")],
+            [Tender(CASH, Decimal("60"), tendered=Decimal("60"))],
+        )
+    ]
+    dest = tmp_path / "export"
+    dest.mkdir()
+    for name in ("sales.csv", "items.csv", "stocks-Till A.csv"):
+        (dest / name).write_text("OLD", encoding="utf-8")
+
+    class FailingWriter:
+        def writerows(self, rows):
+            raise ValueError("writer blew up")
+
+    monkeypatch.setattr(reporting.csv, "writer", lambda handle: FailingWriter())
+    with pytest.raises(ExportError):
+        reporting.write_export(dest, sales, CATALOG, {}, "Till A")
+    for name in ("sales.csv", "items.csv", "stocks-Till A.csv"):
+        assert (dest / name).read_text(encoding="utf-8") == "OLD"
+    assert {p.name for p in dest.iterdir()} == {
+        "sales.csv",
+        "items.csv",
+        "stocks-Till A.csv",
+    }
+
+
+def test_encoding_failure_reaches_export_error_even_when_fdopen_succeeds(
+    tmp_path, monkeypatch
+):
+    """A UnicodeEncodeError raised on flush must be an ExportError too."""
+    sales = [
+        _sale(
+            1,
+            [("MUG", "Mug\ud800", 1, "60")],
+            [Tender(CASH, Decimal("60"), tendered=Decimal("60"))],
+        )
+    ]
+    dest = tmp_path / "export"
+    dest.mkdir()
+
+    with pytest.raises(ExportError):
+        reporting.write_export(dest, sales, [], {}, "Till A")
+    assert list(dest.iterdir()) == []
+
+
 # -- consistency between figures and exports (T2) ---------------------------
 
 

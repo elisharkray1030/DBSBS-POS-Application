@@ -210,9 +210,14 @@ def _cleanup_temps(temps: list[Path]) -> None:
 
 
 def _abort_export(
-    phase: str, temps: list[Path], targets: list[Path], cause: OSError
+    phase: str, temps: list[Path], targets: list[Path], cause: BaseException
 ) -> NoReturn:
-    """Clean up temps and surface a failed export step as an `ExportError`."""
+    """Clean up temps and surface a failed export step as an `ExportError`.
+
+    Handles any handled failure (filesystem `OSError`, encoding and writer
+    errors) so no temporary file leaks and the error reaches the normal dialog
+    and log path.
+    """
     _cleanup_temps(temps)
     raise ExportError(
         f"Export failed while {phase}: " + ", ".join(str(t) for t in targets)
@@ -281,7 +286,7 @@ def write_export(
             with handle:
                 writer = csv.writer(handle)
                 writer.writerows(file_rows)
-    except OSError as exc:
+    except Exception as exc:  # noqa: BLE001  # writer/encoding failures are handled too
         _abort_export("writing the files", temps, targets, exc)
     try:
         for temp, target in zip(temps, targets):

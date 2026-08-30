@@ -230,6 +230,51 @@ class Tender:
     tendered: Money | None = None
 
 
+def validate_settlement(tenders: list[Tender], total: Money) -> None:
+    """Check a settlement against the payment rules (CONTEXT.md: Split
+    settlement).
+
+    The single settlement-validation rule, shared by live settlement (the
+    facade raises `InvalidSettlement`) and stored Sale reconstruction (the
+    persistence boundary translates failures to `CorruptRecordError`).
+    """
+    if not tenders:
+        raise InvalidSettlement("A settlement needs at least one tender")
+    for tender in tenders:
+        if tender.method not in (CASH, OCTOPUS, VOUCHER):
+            raise InvalidSettlement(f"Unknown tender method: {tender.method!r}")
+        if not tender.amount.is_finite():
+            raise InvalidSettlement("A tender amount must be a finite number")
+        if tender.amount <= 0:
+            raise InvalidSettlement("A tender amount must be positive")
+        if tender.method == CASH:
+            if tender.tendered is None:
+                raise InvalidSettlement(
+                    "Cash tendered must be recorded for a cash tender"
+                )
+            if not tender.tendered.is_finite():
+                raise InvalidSettlement("Cash tendered must be a finite number")
+            if tender.tendered < tender.amount:
+                raise InvalidSettlement(
+                    "Cash tendered cannot be less than the cash portion"
+                )
+    tender_total = sum((t.amount for t in tenders), Decimal("0"))
+    if tender_total != total:
+        raise InvalidSettlement(
+            f"Tenders total {tender_total} but the sale is {total}"
+        )
+    octopus = [t for t in tenders if t.method == OCTOPUS]
+    if octopus and len(octopus) > 1:
+        raise InvalidSettlement("A sale can have only one Octopus tender")
+    if octopus:
+        if len(tenders) != 1:
+            raise InvalidSettlement("Octopus must settle the full sale on its own")
+        if octopus[0].amount != total:
+            raise InvalidSettlement(
+                "Octopus must equal the full sale amount; partial Octopus is rejected"
+            )
+
+
 @dataclass
 class Sale:
     """A single customer's purchase (CONTEXT.md: Sale).

@@ -20,7 +20,8 @@ from enum import StrEnum
 from pathlib import Path
 
 # The single concrete release the app is verified against (ticket 02).
-PINNED_CUSTOMTKINTER = "customtkinter==6.0.0"
+PINNED_CUSTOMTKINTER_VERSION = "6.0.0"
+PINNED_CUSTOMTKINTER = f"customtkinter=={PINNED_CUSTOMTKINTER_VERSION}"
 
 # One bounded file, capped so it can never fill the disk on event day.
 MAX_LOG_BYTES = 64 * 1024
@@ -94,36 +95,67 @@ def log_failure(
 
 
 def _entry(source: LogSource, message: str, detail: str | None, now: datetime) -> str:
+    """An entry that fits the log bound, keeping its identity first.
+
+    The header (timestamp, operation, primary message) is kept whole whenever
+    possible; only an oversized detail is truncated to make room. When the
+    header alone cannot fit, the primary message is truncated. The timestamp
+    and the operation always survive, so a huge pip output or message can
+    never erase which operation failed.
+    """
     stamp = now.isoformat(timespec="seconds")
-    lines = [f"{stamp} [{source}] {message}"]
-    if detail:
-        lines.append(f"  detail: {detail}")
-    return "\n".join(lines) + "\n"
+    return _fit_entry(stamp, source, message, detail, MAX_LOG_BYTES)
+
+
+def _fit_entry(
+    stamp: str, source: LogSource, message: str, detail: str | None, limit: int
+) -> str:
+    if detail is None:
+        return _fit_header(f"{stamp} [{source}] {message}", limit)
+    full = f"{stamp} [{source}] {message}\n  detail: {detail}\n"
+    if len(full.encode("utf-8", "replace")) <= limit:
+        return full
+    room = limit - len(f"{stamp} [{source}] {message}\n  detail: \n".encode("utf-8", "replace"))
+    if room > 0:
+        return f"{stamp} [{source}] {message}\n  detail: {_tail_bytes(detail, room)}\n"
+    return _fit_header(f"{stamp} [{source}] {message}", limit)
+
+
+def _fit_header(header: str, limit: int) -> str:
+    text = f"{header}\n"
+    if len(text.encode("utf-8", "replace")) <= limit:
+        return text
+    # Keep the timestamp and the operation, truncating the primary message.
+    stamp, _bracket, rest = header.partition(" [")
+    source, _sep, message = rest.partition("] ")
+    kept = f"{stamp} [{source}] "
+    room = max(limit - len(f"{kept}\n".encode("utf-8", "replace")), 1)
+    return f"{kept}{_tail_bytes(message, room)}\n"
 
 
 def _append_bounded(path: Path, entry: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
-    encoded = (existing + entry).encode("utf-8")
     limit = MAX_LOG_BYTES
-    if len(encoded) > limit:
-        entry_bytes = len(entry.encode("utf-8"))
-        if entry_bytes < limit:
-            # Make room for the whole newest entry by trimming the older
-            # content, so the newest entry keeps its timestamp and source.
-            room = limit - entry_bytes
-            old = _tail_bytes(existing, room)
-            encoded = (old + entry).encode("utf-8")
-        if len(encoded) > limit:
-            # Even the newest entry alone is too big; keep its tail.
-            encoded = encoded[-limit:].decode("utf-8", "ignore").encode("utf-8")
-    path.write_bytes(encoded)
+    encoded = (existing + entry).encode("utf-8", "replace")
+    if len(encoded) <= limit:
+        path.write_bytes(encoded)
+        return
+    # The entry alone fits (it was fitted above); keep it whole by trimming
+    # the older content to make room for it.
+    entry_bytes = len(entry.encode("utf-8", "replace"))
+    room = limit - entry_bytes
+    old = _tail_bytes(existing, room)
+    path.write_bytes((old + entry).encode("utf-8", "replace"))
 
 
 def _tail_bytes(text: str, room: int) -> str:
     """The longest suffix of `text` that encodes to at most `room` bytes,
-    ending on a character boundary."""
-    encoded = text.encode("utf-8")
+    ending on a character boundary. Unencodable characters are replaced so a
+    surrogate in a message cannot raise out of the writer."""
+    if room <= 0:
+        return ""
+    encoded = text.encode("utf-8", "replace")
     if len(encoded) <= room:
         return text
     return encoded[-room:].decode("utf-8", "ignore")
