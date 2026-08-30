@@ -170,7 +170,7 @@ class SaleScreen(ctk.CTkFrame):
         try:
             self.session.add_item_to_sale(item_id, int(self.qty_var.get()))
         except (PosError, ValueError) as exc:
-            show_error("Cannot add item", exc)
+            show_error("Cannot add item", exc, "add to sale")
         self.refresh()
 
     def _toggle_sold_out(self) -> None:
@@ -183,7 +183,7 @@ class SaleScreen(ctk.CTkFrame):
             else:
                 self.session.mark_sold_out(item_id)
         except PosError as exc:
-            show_error("Cannot change sold-out", exc)
+            show_error("Cannot change sold-out", exc, "sold out")
         self.refresh()
 
     def _selected_sale_item_id(self):
@@ -236,7 +236,7 @@ class SaleScreen(ctk.CTkFrame):
         try:
             self.session.set_sale_quantity(item_id, quantity)
         except PosError as exc:
-            show_error("Cannot set quantity", exc)
+            show_error("Cannot set quantity", exc, "set quantity")
         self.refresh()
 
     def _cancel_qty_edit(self, editor: ttk.Entry) -> None:

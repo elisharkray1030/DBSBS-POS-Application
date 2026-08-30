@@ -8,6 +8,7 @@ from tkinter import filedialog, messagebox
 
 import customtkinter as ctk  # type: ignore[import-untyped]
 
+from pos import observability
 from pos.domain import (
     CASH,
     OCTOPUS,
@@ -25,8 +26,9 @@ def fmt(amount: Decimal) -> str:
     return f"{amount:.2f}"
 
 
-def show_error(title: str, exc: Exception) -> None:
+def show_error(title: str, exc: Exception, source: str) -> None:
     messagebox.showerror(title, str(exc))
+    observability.log_failure(source, str(exc))
 
 
 def run_dialog(dialog: ctk.CTkToplevel) -> None:
@@ -131,7 +133,7 @@ class SettleDialog(ctk.CTkToplevel):
         try:
             result = self.session.settle_current_sale(self.section.build_tenders())
         except PosError as exc:
-            show_error("Cannot settle", exc)
+            show_error("Cannot settle", exc, "settlement")
             return
         messagebox.showinfo(
             "Sale settled",
@@ -166,7 +168,7 @@ class AdjustmentDialog(ctk.CTkToplevel):
             amount = money(self.amount.get())
             self.session.record_cash_adjustment(amount, self.reason.get())
         except PosError as exc:
-            show_error("Cannot record adjustment", exc)
+            show_error("Cannot record adjustment", exc, "cash adjustment")
             return
         self.destroy()
 
@@ -237,7 +239,7 @@ class SalesDialog(ctk.CTkToplevel):
         try:
             self.session.void_sale(seq)
         except PosError as exc:
-            show_error("Cannot void", exc)
+            show_error("Cannot void", exc, "void")
         self._refresh()
 
 
@@ -366,7 +368,7 @@ class CorrectionDialog(ctk.CTkToplevel):
                 self.seq, line_items, self.section.build_tenders()
             )
         except (PosError, ValueError) as exc:
-            show_error("Cannot correct", exc)
+            show_error("Cannot correct", exc, "correction")
             return
         self.destroy()
 
@@ -405,7 +407,7 @@ class ExportDialog(ctk.CTkToplevel):
         try:
             paths = self.session.export_csv(folder)
         except PosError as exc:
-            show_error("Cannot export", exc)
+            show_error("Cannot export", exc, "export")
             return
         messagebox.showinfo(
             "Export complete",
@@ -446,7 +448,7 @@ class WipeDialog(ctk.CTkToplevel):
         try:
             self.session.wipe()
         except PosError as exc:
-            show_error("Cannot wipe", exc)
+            show_error("Cannot wipe", exc, "wipe")
             return
         self.destroy()
         self.on_wipe()

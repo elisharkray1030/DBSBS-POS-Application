@@ -8,6 +8,7 @@ __pycache__/
 
 # Runtime device data (created next to main.pyw)
 *.db
+pos.log
 
 # Sample/scratch data files
 InventoryCSV.csv
