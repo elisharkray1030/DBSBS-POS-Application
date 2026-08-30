@@ -433,6 +433,39 @@ def test_corrupt_catalog_price_raises_corrupt_record_error(adapter):
         db.load_settings()
 
 
+def test_non_integer_starting_quantity_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO catalog (item_id, name, price, starting_quantity)"
+        " VALUES ('MUG', 'Mug', '60', 'abc')"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="starting quantity"):
+        db.load_settings()
+
+
+def test_non_integer_sold_out_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO catalog (item_id, name, price, sold_out)"
+        " VALUES ('MUG', 'Mug', '60', 'yes')"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="sold-out flag"):
+        db.load_settings()
+
+
+def test_out_of_range_sold_out_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO catalog (item_id, name, price, sold_out)"
+        " VALUES ('MUG', 'Mug', '60', 2)"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="sold-out flag"):
+        db.load_settings()
+
+
 def test_corrupt_source_cells_raise_corrupt_record_error(adapter):
     db = adapter()
     db._conn.execute(

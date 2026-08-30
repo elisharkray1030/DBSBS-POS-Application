@@ -40,6 +40,12 @@ def _require_text(value, where: str, what: str) -> str:
     return value
 
 
+def _require_int(value, where: str, what: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise CorruptRecordError(f"{where}: corrupt {what} {value!r}")
+    return value
+
+
 def parse_dt(value: str, where: str) -> datetime:
     try:
         return datetime.fromisoformat(value)
@@ -155,12 +161,20 @@ def item_from_row(row: sqlite3.Row) -> Item:
     where = f"Item {row['item_id']!r}"
     item_id = _require_text(row["item_id"], where, "item id")
     name = _require_text(row["name"], where, "name")
+    starting_quantity = row["starting_quantity"]
+    if starting_quantity is not None:
+        starting_quantity = _require_int(
+            starting_quantity, where, "starting quantity"
+        )
+    sold_out = _require_int(row["sold_out"], where, "sold-out flag")
+    if sold_out not in (0, 1):
+        raise CorruptRecordError(f"{where}: corrupt sold-out flag {sold_out!r}")
     return Item(
         item_id=item_id,
         name=name,
         price=parse_money(row["price"], where),
-        starting_quantity=row["starting_quantity"],
-        sold_out=bool(row["sold_out"]),
+        starting_quantity=starting_quantity,
+        sold_out=bool(sold_out),
     )
 
 
