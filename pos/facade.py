@@ -47,6 +47,8 @@ def _validate_tenders(tenders: list[Tender], total: Decimal) -> None:
     for tender in tenders:
         if tender.method not in (CASH, OCTOPUS, VOUCHER):
             raise InvalidSettlement(f"Unknown tender method: {tender.method!r}")
+        if not tender.amount.is_finite():
+            raise InvalidSettlement("A tender amount must be a finite number")
         if tender.amount <= 0:
             raise InvalidSettlement("A tender amount must be positive")
         if tender.method == CASH:
@@ -54,6 +56,8 @@ def _validate_tenders(tenders: list[Tender], total: Decimal) -> None:
                 raise InvalidSettlement(
                     "Cash tendered must be recorded for a cash tender"
                 )
+            if not tender.tendered.is_finite():
+                raise InvalidSettlement("Cash tendered must be a finite number")
             if tender.tendered < tender.amount:
                 raise InvalidSettlement(
                     "Cash tendered cannot be less than the cash portion"

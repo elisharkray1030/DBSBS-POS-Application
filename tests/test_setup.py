@@ -11,7 +11,7 @@ from decimal import Decimal
 
 import pytest
 
-from pos.domain import CatalogError, ItemStock, SetupError
+from pos.domain import CatalogError, InvalidMoney, ItemStock, SetupError
 from pos.facade import PosSession
 from pos.persistence import InMemoryPersistence
 
@@ -32,6 +32,14 @@ def test_float_rejects_negative(session):
         session.set_float(-1)
     session.set_float("0")
     assert session.float_amount() == Decimal("0")
+
+
+def test_float_rejects_non_finite(session):
+    with pytest.raises(InvalidMoney):
+        session.set_float(Decimal("NaN"))
+    with pytest.raises(InvalidMoney):
+        session.set_float("Infinity")
+    assert session.float_amount() is None
 
 
 def test_catalog_loads_items_with_prices_and_quantities(session, catalog_file):

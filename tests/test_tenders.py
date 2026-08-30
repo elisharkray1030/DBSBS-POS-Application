@@ -15,6 +15,7 @@ from pos.domain import (
     OCTOPUS,
     VOUCHER,
     InvalidSettlement,
+    SaleNotFound,
     Tender,
 )
 
@@ -111,3 +112,41 @@ def test_no_tenders_is_rejected(configured_session):
     configured_session.add_item_to_sale("MUG", 1)
     with pytest.raises(InvalidSettlement):
         configured_session.settle_current_sale([])
+
+
+def test_non_finite_tender_amount_is_rejected(configured_session):
+    configured_session.add_item_to_sale("MUG", 1)
+    with pytest.raises(InvalidSettlement):
+        configured_session.settle_current_sale([Tender(VOUCHER, Decimal("NaN"))])
+    assert configured_session.current_sale_total() == Decimal("60")
+    with pytest.raises(SaleNotFound):
+        configured_session.get_sale(1)
+
+
+def test_non_finite_cash_tendered_is_rejected(configured_session):
+    configured_session.add_item_to_sale("MUG", 1)
+    with pytest.raises(InvalidSettlement):
+        configured_session.settle_current_sale(
+            [Tender(CASH, Decimal("60"), tendered=Decimal("Infinity"))]
+        )
+    assert configured_session.current_sale_total() == Decimal("60")
+    with pytest.raises(SaleNotFound):
+        configured_session.get_sale(1)
+
+
+def test_correct_sale_with_non_finite_tender_is_rejected(configured_session):
+    configured_session.add_item_to_sale("MUG", 1)
+    configured_session.settle_current_sale(
+        [Tender(CASH, Decimal("60"), tendered=Decimal("60"))]
+    )
+    from tests.helpers import line_item
+
+    with pytest.raises(InvalidSettlement):
+        configured_session.correct_sale(
+            seq=1,
+            line_items=[line_item(configured_session, "Mug", 1)],
+            tenders=[Tender(CASH, Decimal("NaN"), tendered=Decimal("NaN"))],
+        )
+    sale = configured_session.get_sale(1)
+    assert sale.line_items[0].item_id == "MUG"
+    assert sale.tender_sum(CASH) == Decimal("60")

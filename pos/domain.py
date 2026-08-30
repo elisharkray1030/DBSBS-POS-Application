@@ -48,6 +48,16 @@ class CatalogError(PosError):
     """Raised when catalog data is malformed."""
 
 
+class InvalidMoney(PosError):
+    """Raised when a money value is not a finite decimal number.
+
+    Raised by the `money` coercion for non-numeric input and for non-finite
+    values (NaN, signaling NaN, positive/negative infinity) regardless of
+    input type. The coercion is sign-agnostic: a negative cash adjustment is
+    legitimate, so negativity is a rule for the caller, not for money.
+    """
+
+
 class InvalidSettlement(PosError):
     """Raised when a settlement does not respect the payment rules."""
 
@@ -65,20 +75,24 @@ class SaleNotFound(PosError):
 
 
 def money(value: str | Decimal | float) -> Money:
-    """Coerce a value to a Decimal, raising for non-numeric input."""
+    """Coerce a value to a finite Decimal, raising for non-finite input."""
     if isinstance(value, Decimal):
-        return value
-    if isinstance(value, int):
-        return Decimal(value)
-    if isinstance(value, float):
-        return Decimal(str(value))
-    text = str(value).strip()
-    if not text:
-        raise CatalogError(f"Not a money value: {value!r}")
-    try:
-        return Decimal(text)
-    except Exception as exc:
-        raise CatalogError(f"Not a money value: {value!r}") from exc
+        result = value
+    elif isinstance(value, int):
+        result = Decimal(value)
+    elif isinstance(value, float):
+        result = Decimal(str(value))
+    else:
+        text = str(value).strip()
+        if not text:
+            raise InvalidMoney(f"Not a money value: {value!r}")
+        try:
+            result = Decimal(text)
+        except Exception as exc:
+            raise InvalidMoney(f"Not a money value: {value!r}") from exc
+    if not result.is_finite():
+        raise InvalidMoney(f"Not a finite money value: {result}")
+    return result
 
 
 # The four source cells (ItemID, ItemName, Price, Inventory) of a Stock sheet

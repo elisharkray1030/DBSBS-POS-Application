@@ -14,8 +14,8 @@ from datetime import datetime
 
 from .domain import (
     CashAdjustment,
-    CatalogError,
     CorruptRecordError,
+    InvalidMoney,
     Item,
     LineItem,
     Sale,
@@ -39,7 +39,7 @@ def parse_dt(value: str, where: str) -> datetime:
 def parse_money(value: str, where: str):
     try:
         return money(value)
-    except CatalogError as exc:
+    except InvalidMoney as exc:
         raise CorruptRecordError(f"{where}: bad money value {value!r}") from exc
 
 

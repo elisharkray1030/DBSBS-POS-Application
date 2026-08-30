@@ -170,6 +170,94 @@ def test_load_missing_file_raises(tmp_path):
         stock_sheet.load_catalog(tmp_path / "does-not-exist.csv")
 
 
+def test_load_rejects_negative_price(tmp_path):
+    sheet = write_sheet(
+        tmp_path,
+        "ItemID,ItemName,Price,Inventory,Sales,Revenue\n"
+        "MUG,Mug,-60,20,0,0\n",
+    )
+    with pytest.raises(CatalogError):
+        stock_sheet.load_catalog(sheet)
+
+
+def test_load_accepts_zero_price(tmp_path):
+    sheet = write_sheet(
+        tmp_path,
+        "ItemID,ItemName,Price,Inventory,Sales,Revenue\n"
+        "MUG,Mug,0,20,0,0\n",
+    )
+    loaded = stock_sheet.load_catalog(sheet)
+    assert loaded.items[0].price == Decimal("0")
+
+
+def test_load_rejects_non_finite_price(tmp_path):
+    sheet = write_sheet(
+        tmp_path,
+        "ItemID,ItemName,Price,Inventory,Sales,Revenue\n"
+        "MUG,Mug,NaN,20,0,0\n",
+    )
+    with pytest.raises(CatalogError):
+        stock_sheet.load_catalog(sheet)
+
+
+def test_load_rejects_row_wider_than_six_columns(tmp_path):
+    sheet = write_sheet(
+        tmp_path,
+        "ItemID,ItemName,Price,Inventory,Sales,Revenue\n"
+        "MUG,Mug,60,20,0,0,EXTRA\n",
+    )
+    with pytest.raises(CatalogError, match="MUG"):
+        stock_sheet.load_catalog(sheet)
+
+
+def test_load_rejects_trailing_empty_seventh_field(tmp_path):
+    sheet = write_sheet(
+        tmp_path,
+        "ItemID,ItemName,Price,Inventory,Sales,Revenue\n"
+        "MUG,Mug,60,20,0,0,\n",
+    )
+    with pytest.raises(CatalogError, match="MUG"):
+        stock_sheet.load_catalog(sheet)
+
+
+def test_load_short_row_error_names_the_row(tmp_path):
+    sheet = write_sheet(
+        tmp_path,
+        "ItemID,ItemName,Price,Inventory,Sales,Revenue\n"
+        "MUG,Mug,60,20,0,0\n"
+        "BDG\n",
+    )
+    with pytest.raises(CatalogError, match="Row 3"):
+        stock_sheet.load_catalog(sheet)
+
+
+def test_load_invalid_encoding_raises_catalog_error(tmp_path):
+    path = tmp_path / "bad-encoding.csv"
+    path.write_bytes(
+        b"ItemID,ItemName,Price,Inventory,Sales,Revenue\n"
+        b"MUG,Mug,60,20,\xff,\xff\n"
+    )
+    with pytest.raises(CatalogError):
+        stock_sheet.load_catalog(path)
+
+
+def test_load_csv_parse_failure_raises_catalog_error(tmp_path):
+    import csv as csv_module
+
+    old_limit = csv_module.field_size_limit()
+    try:
+        csv_module.field_size_limit(10)
+        sheet = write_sheet(
+            tmp_path,
+            "ItemID,ItemName,Price,Inventory,Sales,Revenue\n"
+            "MUG," + "x" * 100 + ",60,20,0,0\n",
+        )
+        with pytest.raises(CatalogError):
+            stock_sheet.load_catalog(sheet)
+    finally:
+        csv_module.field_size_limit(old_limit)
+
+
 # -- build_report_rows -----------------------------------------------------
 
 

@@ -11,7 +11,7 @@ from decimal import Decimal
 
 import pytest
 
-from pos.domain import CASH, PosError, Tender
+from pos.domain import CASH, InvalidMoney, PosError, Tender
 
 
 def settle(configured_session, item, qty, amount):
@@ -78,6 +78,14 @@ def test_cash_adjustments_are_not_sales(configured_session):
 def test_zero_adjustment_rejected(configured_session):
     with pytest.raises(PosError):
         configured_session.record_cash_adjustment(0, "no-op")
+
+
+def test_non_finite_adjustment_rejected(configured_session):
+    with pytest.raises(InvalidMoney):
+        configured_session.record_cash_adjustment(Decimal("NaN"), "Topping up change")
+    with pytest.raises(InvalidMoney):
+        configured_session.record_cash_adjustment(Decimal("Infinity"), "Topping up change")
+    assert configured_session.list_cash_adjustments() == []
 
 
 def test_adjustment_requires_a_reason(configured_session):
