@@ -13,6 +13,11 @@ import sqlite3
 from datetime import datetime
 
 from .domain import (
+    CASH,
+    COMPLETED,
+    OCTOPUS,
+    VOIDED,
+    VOUCHER,
     CashAdjustment,
     CorruptRecordError,
     InvalidMoney,
@@ -27,6 +32,12 @@ from .domain import (
 
 def iso(value: datetime) -> str:
     return value.isoformat()
+
+
+def _require_text(value, where: str, what: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise CorruptRecordError(f"{where}: corrupt {what} {value!r}")
+    return value
 
 
 def parse_dt(value: str, where: str) -> datetime:
@@ -60,6 +71,8 @@ def line_item_from_dict(data: dict, where: str) -> LineItem:
         price = parse_money(data["price"], where)
     except (KeyError, TypeError, ValueError) as exc:
         raise CorruptRecordError(f"{where}: corrupt line item ({exc})") from exc
+    item_id = _require_text(item_id, where, "item id")
+    item_name = _require_text(item_name, where, "item name")
     return LineItem(item_id=item_id, item_name=item_name, quantity=quantity, price=price)
 
 
@@ -82,6 +95,8 @@ def tender_from_dict(data: dict, where: str) -> Tender:
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise CorruptRecordError(f"{where}: corrupt tender ({exc})") from exc
+    if method not in (CASH, OCTOPUS, VOUCHER):
+        raise CorruptRecordError(f"{where}: unknown tender method {method!r}")
     return Tender(method=method, amount=amount, tendered=tendered)
 
 
@@ -105,6 +120,8 @@ def sale_from_row(row: sqlite3.Row) -> Sale:
     try:
         seq = int(row["seq"])
         where = f"Sale {seq}"
+        status = row["status"]
+        device_name = row["device_name"]
         line_items = [
             line_item_from_dict(data, where)
             for data in json.loads(row["line_items"])
@@ -120,22 +137,27 @@ def sale_from_row(row: sqlite3.Row) -> Sale:
         raise CorruptRecordError(
             f"Sale {row['seq']!r}: corrupt record ({exc})"
         ) from exc
+    if status not in (COMPLETED, VOIDED):
+        raise CorruptRecordError(f"{where}: unknown sale status {status!r}")
+    device_name = _require_text(device_name, where, "device name")
     return Sale(
         seq=seq,
         created_at=created_at,
         updated_at=updated_at,
-        status=row["status"],
+        status=status,
         line_items=line_items,
         tenders=tenders,
-        device_name=row["device_name"],
+        device_name=device_name,
     )
 
 
 def item_from_row(row: sqlite3.Row) -> Item:
     where = f"Item {row['item_id']!r}"
+    item_id = _require_text(row["item_id"], where, "item id")
+    name = _require_text(row["name"], where, "name")
     return Item(
-        item_id=row["item_id"],
-        name=row["name"],
+        item_id=item_id,
+        name=name,
         price=parse_money(row["price"], where),
         starting_quantity=row["starting_quantity"],
         sold_out=bool(row["sold_out"]),

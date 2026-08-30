@@ -37,6 +37,7 @@ from .domain import (
     Tender,
     money,
 )
+from .persistence import Persistence
 
 Clock = Callable[[], datetime]
 
@@ -91,8 +92,8 @@ def _change_due(tenders: list[Tender]) -> Decimal:
 
 
 class PosSession:
-    def __init__(self, persistence, clock: Clock | None = None) -> None:
-        self._persistence = persistence
+    def __init__(self, persistence: Persistence, clock: Clock | None = None) -> None:
+        self._persistence: Persistence = persistence
         self._clock: Clock = clock or datetime.now
         self._settings = persistence.load_settings() or Settings()
         self._current_items: list[LineItem] = []
