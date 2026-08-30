@@ -7,7 +7,8 @@ from tkinter import filedialog, messagebox
 
 import customtkinter as ctk  # type: ignore[import-untyped]
 
-from pos import observability
+from pos import diagnostics
+from pos.diagnostics import LogSource
 from pos.domain import PosError, money
 
 from . import style
@@ -81,7 +82,7 @@ class SetupScreen(ctk.CTkFrame):
             count = self.session.load_catalog(chosen)
         except (PosError, OSError, ValueError) as exc:
             self.csv_status.set(f"Could not load: {exc}")
-            observability.log_failure("setup catalog", str(exc))
+            diagnostics.log_failure(LogSource.SETUP_CATALOG, str(exc))
             self._loaded = False
             return
         self.csv_status.set(f"Loaded {count} items.")
@@ -97,6 +98,6 @@ class SetupScreen(ctk.CTkFrame):
             self.session.set_float(money(self.float_var.get()))
             self.session.set_device_name(self.device_var.get())
         except PosError as exc:
-            show_error("Cannot start", exc, "setup")
+            show_error("Cannot start", exc, LogSource.SETUP)
             return
         self.app.show_sale()

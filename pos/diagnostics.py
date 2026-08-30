@@ -1,10 +1,11 @@
-"""Local failure observability for the DBS Garden Fete POS.
+"""Startup diagnostics and failure observability for the DBS Garden Fete POS.
 
-The register's bounded, secret-safe, never-raising failure log (spec #64).
-Pure functions only — no UI, no network. Callers name the operation that
-failed and the module writes a timestamped entry to a log file beside the
-device database, keeping the file bounded so it can never fill the laptop's
-disk across an event day.
+Pure functions only — no UI, no network. The register records a failure by
+naming the operation that failed (a `LogSource`), and this module writes a
+timestamped entry to a log file beside the device database, keeping the file
+bounded so it can never fill the laptop's disk across an event day. It also
+owns the pinned dependency release and the pip command that installs it, so
+first-run setup is reproducible.
 
 Secret-safety: the module writes exactly the strings callers pass. It never
 reads the environment, never logs full command lines, and never scans for
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime
+from enum import StrEnum
 from pathlib import Path
 
 # The single concrete release the app is verified against (ticket 02).
@@ -25,6 +27,26 @@ MAX_LOG_BYTES = 64 * 1024
 
 LOG_FILE_NAME = "pos.log"
 
+
+class LogSource(StrEnum):
+    """The operation a failure entry names (CONTEXT.md vocabulary where one exists)."""
+
+    BOOTSTRAP = "bootstrap"
+    DEVICE_DATABASE = "device database"
+    APP = "app"
+    SETUP = "setup"
+    SETUP_CATALOG = "setup catalog"
+    EXPORT = "export"
+    SETTLEMENT = "settlement"
+    CASH_ADJUSTMENT = "cash adjustment"
+    VOID = "void"
+    CORRECTION = "correction"
+    WIPE = "wipe"
+    ADD_TO_SALE = "add to sale"
+    SOLD_OUT = "sold out"
+    SET_QUANTITY = "set quantity"
+
+
 _log_dir: Path = Path.cwd()
 
 
@@ -32,6 +54,11 @@ def set_log_dir(base_dir: str | Path) -> None:
     """Point the failure log at a directory. Called once at startup."""
     global _log_dir
     _log_dir = Path(base_dir)
+
+
+def log_dir() -> Path:
+    """The directory the failure log is currently configured to use."""
+    return _log_dir
 
 
 def log_path(base_dir: str | Path | None = None) -> Path:
@@ -52,7 +79,7 @@ def pip_install_command(python_executable: str | None = None) -> list[str]:
 
 
 def log_failure(
-    source: str,
+    source: LogSource,
     message: str,
     detail: str | None = None,
     *,
@@ -66,7 +93,7 @@ def log_failure(
         return
 
 
-def _entry(source: str, message: str, detail: str | None, now: datetime) -> str:
+def _entry(source: LogSource, message: str, detail: str | None, now: datetime) -> str:
     stamp = now.isoformat(timespec="seconds")
     lines = [f"{stamp} [{source}] {message}"]
     if detail:

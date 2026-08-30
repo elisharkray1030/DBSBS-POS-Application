@@ -14,9 +14,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
-import tkinter as tk
 from pathlib import Path
-from tkinter import messagebox
 
 APP_DIR = Path(__file__).resolve().parent
 
@@ -32,11 +30,11 @@ def dependency_available() -> bool:
 
 def install_dependency() -> str | None:
     """Install the pinned dependency; return captured pip output on failure."""
-    from pos import observability
+    from pos import diagnostics
 
     try:
         result = subprocess.run(
-            observability.pip_install_command(sys.executable),
+            diagnostics.pip_install_command(sys.executable),
             capture_output=True,
             text=True,
             check=False,  # return code inspected below; pip output kept on failure
@@ -57,31 +55,24 @@ def install_failure_hint(detail: str) -> str:
     if (
         "permission" in lowered
         or "access is denied" in lowered
-        or "access denied" in lowered
+or "access denied" in lowered
     ):
         return "This looks like a permissions problem on this laptop."
     return "This usually means this laptop has no internet connection right now."
 
 
-def fatal_error(message: str) -> None:
-    root = tk.Tk()
-    root.withdraw()
-    try:
-        messagebox.showerror("DBS Garden Fete POS", message)
-    finally:
-        root.destroy()
-
-
 def main() -> int:
     sys.path.insert(0, str(APP_DIR))
-    from pos import observability
+    from pos import diagnostics
+    from pos.diagnostics import LogSource
+    from pos.fatal import fatal_error
 
-    observability.set_log_dir(APP_DIR)
+    diagnostics.set_log_dir(APP_DIR)
     if not dependency_available():
         detail = install_dependency()
         if detail is not None:
-            observability.log_failure(
-                "bootstrap",
+            diagnostics.log_failure(
+                LogSource.BOOTSTRAP,
                 "The customtkinter dependency could not be installed.",
                 detail=detail,
             )
@@ -92,7 +83,7 @@ def main() -> int:
                 "Run this script once while connected to the internet so it "
                 "can set itself up, then run it again on event day.\n\n"
                 f"The full installation details were written to:\n"
-                f"{observability.log_path()}"
+                f"{diagnostics.log_path()}"
             )
             return 1
     import main
