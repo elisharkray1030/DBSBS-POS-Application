@@ -55,7 +55,7 @@ def install_failure_hint(detail: str) -> str:
     if (
         "permission" in lowered
         or "access is denied" in lowered
-or "access denied" in lowered
+        or "access denied" in lowered
     ):
         return "This looks like a permissions problem on this laptop."
     return "This usually means this laptop has no internet connection right now."
