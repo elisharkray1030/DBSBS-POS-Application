@@ -23,9 +23,9 @@ from pos.domain import (
     VOIDED,
     VOUCHER,
     CashAdjustment,
+    ExportError,
     Item,
     LineItem,
-    PosError,
     Sale,
     Tender,
 )
@@ -294,7 +294,7 @@ def test_export_failure_before_rename_leaves_destination_untouched(tmp_path, mon
         raise OSError("disk full")
 
     monkeypatch.setattr(reporting, "sales_rows", boom)
-    with pytest.raises(OSError):
+    with pytest.raises(ExportError):
         reporting.write_export(dest, sales, CATALOG, source_cells, "Till A")
     for name in ("sales.csv", "items.csv", "stocks-Till A.csv"):
         assert (dest / name).read_text(encoding="utf-8") == "OLD"
@@ -323,7 +323,7 @@ def test_export_temp_write_failure_cleans_up_temp_files(tmp_path, monkeypatch):
                 raise OSError("disk full")
 
     monkeypatch.setattr(reporting.csv, "writer", lambda handle: FailingWriter())
-    with pytest.raises(OSError):
+    with pytest.raises(ExportError):
         reporting.write_export(dest, sales, CATALOG, source_cells, "Till A")
     for name in ("sales.csv", "items.csv", "stocks-Till A.csv"):
         assert (dest / name).read_text(encoding="utf-8") == "OLD"
@@ -334,7 +334,9 @@ def test_export_temp_write_failure_cleans_up_temp_files(tmp_path, monkeypatch):
     }
 
 
-def test_export_rename_failure_names_the_files(tmp_path, monkeypatch):
+def test_export_rename_failure_names_the_files_and_cleans_up_temps(
+    tmp_path, monkeypatch
+):
     sales = [
         _sale(
             1,
@@ -350,12 +352,58 @@ def test_export_rename_failure_names_the_files(tmp_path, monkeypatch):
         raise OSError("rename blocked")
 
     monkeypatch.setattr(os, "replace", boom)
-    with pytest.raises(PosError) as excinfo:
+    with pytest.raises(ExportError) as excinfo:
         reporting.write_export(dest, sales, CATALOG, source_cells, "Till A")
     message = str(excinfo.value)
     assert "sales.csv" in message
     assert "items.csv" in message
     assert "stocks-Till A.csv" in message
+    assert list(dest.iterdir()) == []  # no temp files survive a rename failure
+
+
+# -- export hardening (spec #65) -------------------------------------------
+
+
+def test_write_export_rejects_an_unsafe_device_name_before_creating_files(tmp_path):
+    dest = tmp_path / "export"
+    with pytest.raises(ExportError):
+        reporting.write_export(dest, [], [], {}, "CON")
+    with pytest.raises(ExportError):
+        reporting.write_export(dest, [], [], {}, "../evil")
+    assert not dest.exists()
+
+
+def test_write_export_valid_names_keep_the_expected_filenames(tmp_path):
+    for index, name in enumerate(["Till A", "Till-A", "Till A 2", "Till.A"]):
+        dest = tmp_path / str(index)
+        paths = reporting.write_export(dest, [], [], {}, name)
+        assert paths[-1].name == f"stocks-{name}.csv"
+
+
+def test_write_export_never_touches_a_fixed_named_tmp_file(tmp_path):
+    dest = tmp_path / "export"
+    dest.mkdir()
+    leftover = dest / "sales.csv.tmp"
+    leftover.write_text("KEEP", encoding="utf-8")
+    reporting.write_export(dest, [], [], {}, "Till A")
+    assert leftover.read_text(encoding="utf-8") == "KEEP"
+
+
+def test_write_export_folder_creation_failure_maps_to_export_error(tmp_path):
+    blocker = tmp_path / "blocker"
+    blocker.write_text("x", encoding="utf-8")
+    with pytest.raises(ExportError):
+        reporting.write_export(blocker / "export", [], [], {}, "Till A")
+
+
+def test_write_export_succeeds_for_the_longest_valid_device_name(tmp_path):
+    from pos.domain import MAX_DEVICE_NAME_LENGTH
+
+    name = "x" * MAX_DEVICE_NAME_LENGTH
+    dest = tmp_path / "export"
+    paths = reporting.write_export(dest, [], [], {}, name)
+    assert paths[-1].name == f"stocks-{name}.csv"
+    assert paths[-1].exists()
 
 
 # -- consistency between figures and exports (T2) ---------------------------

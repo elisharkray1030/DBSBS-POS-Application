@@ -21,6 +21,7 @@ from .domain import (
     VOIDED,
     VOUCHER,
     CashAdjustment,
+    ExportError,
     InvalidSettlement,
     Item,
     ItemNotFound,
@@ -36,6 +37,7 @@ from .domain import (
     SetupError,
     Tender,
     money,
+    validate_device_name,
 )
 from .persistence import Persistence
 
@@ -119,9 +121,7 @@ class PosSession:
     # -- setup --------------------------------------------------------------
 
     def set_device_name(self, name: str) -> None:
-        name = name.strip()
-        if not name:
-            raise SetupError("Device name cannot be empty")
+        name = validate_device_name(name)
         self._settings.device_name = name
         self._save_settings()
 
@@ -353,13 +353,18 @@ class PosSession:
 
     def export_csv(self, directory: str | Path) -> list[Path]:
         self._require_configured()
-        paths = reporting.write_export(
-            directory=directory,
-            sales=self._persistence.get_sales(),
-            catalog=self._settings.catalog,
-            source_cells=self._settings.source_cells,
-            device_name=self._settings.device_name,
-        )
+        try:
+            paths = reporting.write_export(
+                directory=directory,
+                sales=self._persistence.get_sales(),
+                catalog=self._settings.catalog,
+                source_cells=self._settings.source_cells,
+                device_name=self._settings.device_name,
+            )
+        except OSError as exc:
+            # The UI boundary: no raw OSError may reach the dialog layer, even
+            # if write_export misses a filesystem path (spec #65).
+            raise ExportError(f"Export failed: {exc}") from exc
         self._settings.last_export_at = self._now()
         self._save_settings()
         return paths

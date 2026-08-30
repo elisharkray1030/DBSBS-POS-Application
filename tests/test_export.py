@@ -11,7 +11,10 @@ from __future__ import annotations
 import csv
 from decimal import Decimal
 
-from pos.domain import CASH, OCTOPUS, Tender
+import pytest
+
+from pos import reporting
+from pos.domain import CASH, OCTOPUS, ExportError, Tender
 
 
 def read_rows(path):
@@ -102,6 +105,17 @@ def test_corrected_sales_export_final_state_with_original_creation_time(
     assert row[2] == created
     assert row[3] != created  # updated time differs
     assert row[5] == "60"
+
+
+def test_export_csv_converts_a_leaked_oserror_to_export_error(
+    configured_session, tmp_path, monkeypatch
+):
+    def boom(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(reporting, "write_export", boom)
+    with pytest.raises(ExportError):
+        configured_session.export_csv(tmp_path / "export")
 
 
 def _line_item(session, name, qty):

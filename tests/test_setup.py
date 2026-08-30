@@ -27,6 +27,20 @@ def test_device_name_required(session):
     assert session.device_name() == "Till B"
 
 
+@pytest.mark.parametrize(
+    "name",
+    ["../evil", "a/b", "CON", "NUL.txt", "COM1", "Till*A", "Till:A", "x" * 245],
+)
+def test_set_device_name_rejects_names_unsafe_for_the_export_file(session, name):
+    with pytest.raises(SetupError):
+        session.set_device_name(name)
+
+
+def test_set_device_name_trims_and_stores_a_valid_name(session):
+    session.set_device_name("  Till A.  ")
+    assert session.device_name() == "Till A"
+
+
 def test_float_rejects_negative(session):
     with pytest.raises(SetupError):
         session.set_float(-1)

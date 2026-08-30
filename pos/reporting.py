@@ -14,22 +14,28 @@ from __future__ import annotations
 
 import csv
 import os
+import tempfile
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
+from typing import NoReturn
 
 from . import stock_sheet
 from .domain import (
     CASH,
     COMPLETED,
     OCTOPUS,
+    STOCK_REPORT_FILE_PREFIX,
+    STOCK_REPORT_FILE_SUFFIX,
     VOUCHER,
     CashAdjustment,
+    ExportError,
     Item,
     Money,
-    PosError,
     Sale,
+    SetupError,
     SourceCells,
+    validate_device_name,
 )
 
 SALES_HEADER = [
@@ -194,6 +200,25 @@ def stock_sheet_rows(
 # -- export coordinator -----------------------------------------------------
 
 
+def _cleanup_temps(temps: list[Path]) -> None:
+    """Remove any temp files still present after a failed export step."""
+    for temp in temps:
+        try:
+            os.remove(temp)
+        except OSError:
+            pass
+
+
+def _abort_export(
+    phase: str, temps: list[Path], targets: list[Path], cause: OSError
+) -> NoReturn:
+    """Clean up temps and surface a failed export step as an `ExportError`."""
+    _cleanup_temps(temps)
+    raise ExportError(
+        f"Export failed while {phase}: " + ", ".join(str(t) for t in targets)
+    ) from cause
+
+
 def write_export(
     directory: str | Path,
     sales: list[Sale],
@@ -203,44 +228,64 @@ def write_export(
 ) -> list[Path]:
     """Write the three export files atomically and return their paths.
 
-    Every row is precomputed first; the files are written as temp files and
-    renamed into place. The destination is either the old export or the new
-    one, never a half-written mix: a failure during precompute or temp-writing
-    leaves the destination untouched; a rename-phase failure (vanishingly
-    rare) raises an error naming the files.
+    Every row is precomputed first; the files are written as short, unique
+    temp files in the destination folder and renamed into place one at a
+    time, so each destination is either the old file or the new one, never a
+    truncated mix. Any failure removes every temp file and surfaces as an
+    `ExportError`; a failure before the renames leaves existing destinations
+    untouched, while a mid-rename failure can leave a mix of old and new
+    files (per-file atomicity only, ADR-0003).
     """
+    try:
+        device_name = validate_device_name(device_name)
+    except SetupError as exc:
+        raise ExportError(str(exc)) from None
     directory = Path(directory)
-    directory.mkdir(parents=True, exist_ok=True)
-    sold_by_item = aggregate_sold_and_revenue(sales)
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise ExportError(
+            f"Export failed: cannot create the export folder {directory}"
+        ) from exc
     targets = [
         directory / "sales.csv",
         directory / "items.csv",
-        directory / f"stocks-{device_name}.csv",
+        directory
+        / f"{STOCK_REPORT_FILE_PREFIX}{device_name}{STOCK_REPORT_FILE_SUFFIX}",
     ]
-    rows = [
-        sales_rows(sales),
-        item_rows(sales),
-        stock_sheet_rows(catalog, sold_by_item, source_cells),
-    ]
-    temps = [target.with_name(target.name + ".tmp") for target in targets]
+    temps: list[Path] = []
     try:
-        for temp, file_rows in zip(temps, rows):
-            with open(temp, "w", newline="", encoding="utf-8") as handle:
+        sold_by_item = aggregate_sold_and_revenue(sales)
+        rows = [
+            sales_rows(sales),
+            item_rows(sales),
+            stock_sheet_rows(catalog, sold_by_item, source_cells),
+        ]
+    except OSError as exc:
+        _abort_export("building the rows", temps, targets, exc)
+    try:
+        for target, file_rows in zip(targets, rows):
+            fd, temp_name = tempfile.mkstemp(
+                prefix="pos-export-", suffix=".tmp", dir=directory
+            )
+            temps.append(Path(temp_name))
+            handle = None
+            try:
+                handle = os.fdopen(fd, "w", newline="", encoding="utf-8")
+            finally:
+                if handle is None:
+                    try:
+                        os.close(fd)
+                    except OSError:
+                        pass
+            with handle:
                 writer = csv.writer(handle)
                 writer.writerows(file_rows)
-    except OSError:
-        for temp in temps:
-            try:
-                os.remove(temp)
-            except OSError:
-                pass
-        raise
+    except OSError as exc:
+        _abort_export("writing the files", temps, targets, exc)
     try:
         for temp, target in zip(temps, targets):
             os.replace(temp, target)
-    except OSError:
-        raise PosError(
-            "Export failed while renaming files into place: "
-            + ", ".join(str(target) for target in targets)
-        ) from None
+    except OSError as exc:
+        _abort_export("renaming files into place", temps, targets, exc)
     return targets
