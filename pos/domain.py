@@ -48,6 +48,25 @@ class CatalogError(PosError):
     """Raised when catalog data is malformed."""
 
 
+class ExportError(PosError):
+    """Raised when the end-of-day CSV export cannot be written safely.
+
+    Covers filesystem failures (folder creation, temp writes, renames) and
+    an unsafe device name reaching the export. The export dialog displays
+    it through the normal error path.
+    """
+
+
+class InvalidMoney(PosError):
+    """Raised when a money value is not a finite decimal number.
+
+    Raised by the `money` coercion for non-numeric input and for non-finite
+    values (NaN, signaling NaN, positive/negative infinity) regardless of
+    input type. The coercion is sign-agnostic: a negative cash adjustment is
+    legitimate, so negativity is a rule for the caller, not for money.
+    """
+
+
 class InvalidSettlement(PosError):
     """Raised when a settlement does not respect the payment rules."""
 
@@ -65,20 +84,78 @@ class SaleNotFound(PosError):
 
 
 def money(value: str | Decimal | float) -> Money:
-    """Coerce a value to a Decimal, raising for non-numeric input."""
+    """Coerce a value to a finite Decimal, raising for non-finite input."""
     if isinstance(value, Decimal):
-        return value
-    if isinstance(value, int):
-        return Decimal(value)
-    if isinstance(value, float):
-        return Decimal(str(value))
-    text = str(value).strip()
-    if not text:
-        raise CatalogError(f"Not a money value: {value!r}")
-    try:
-        return Decimal(text)
-    except Exception as exc:
-        raise CatalogError(f"Not a money value: {value!r}") from exc
+        result = value
+    elif isinstance(value, int):
+        result = Decimal(value)
+    elif isinstance(value, float):
+        result = Decimal(str(value))
+    else:
+        text = str(value).strip()
+        if not text:
+            raise InvalidMoney(f"Not a money value: {value!r}")
+        try:
+            result = Decimal(text)
+        except Exception as exc:
+            raise InvalidMoney(f"Not a money value: {value!r}") from exc
+    if not result.is_finite():
+        raise InvalidMoney(f"Not a finite money value: {result}")
+    return result
+
+
+# Device names are embedded in the export as `stocks-<name>.csv`, so they
+# must obey the file system's rules (ADR-0005). The register runs only on
+# Windows laptops (CONTEXT.md: Device); the rules below are Windows NTFS
+# ones, applied as a reject-list so legitimate names such as "Till A" keep
+# working.
+_ILLEGAL_FILENAME_CHARS = frozenset('<>:"/\\|?*')
+_RESERVED_DEVICE_NAMES = frozenset(
+    {"CON", "PRN", "AUX", "NUL"}
+    | {f"COM{i}" for i in range(1, 10)}
+    | {f"LPT{i}" for i in range(1, 10)}
+)
+# The device name is embedded in the Stock sheet report file name (ADR-0003,
+# ADR-0005). These are the single source for that name's shape.
+STOCK_REPORT_FILE_PREFIX = "stocks-"
+STOCK_REPORT_FILE_SUFFIX = ".csv"
+_MAX_FILENAME_LENGTH = 255  # NTFS maximum per-component length
+MAX_DEVICE_NAME_LENGTH = (
+    _MAX_FILENAME_LENGTH - len(STOCK_REPORT_FILE_PREFIX) - len(STOCK_REPORT_FILE_SUFFIX)
+)
+
+
+def validate_device_name(name: str) -> str:
+    """Trim and validate a device name for safe use in a file name.
+
+    The name becomes the component `stocks-<name>.csv` of the end-of-day
+    export (ADR-0005), so it must contain no path separator or traversal, no
+    Windows-illegal or control character, no reserved device name, and must
+    stay short enough for the export file name to fit the NTFS limit. Returns
+    the trimmed name; raises `SetupError` for a name that cannot be used.
+    """
+    name = name.strip()
+    name = name.rstrip(".")
+    name = name.strip()
+    if not name:
+        raise SetupError("Device name cannot be empty")
+    if len(name.encode("utf-16-le")) // 2 > MAX_DEVICE_NAME_LENGTH:
+        raise SetupError(
+            f"Device name is too long for the export file name "
+            f"(limit {MAX_DEVICE_NAME_LENGTH} UTF-16 units)"
+        )
+    if any(ch in _ILLEGAL_FILENAME_CHARS for ch in name):
+        raise SetupError(
+            "Device name contains characters that are not safe in a file name"
+        )
+    if any(ord(ch) < 32 for ch in name):
+        raise SetupError("Device name contains control characters")
+    stem = name.split(".", 1)[0].upper()
+    if stem in _RESERVED_DEVICE_NAMES:
+        raise SetupError(
+            f"{name!r} is a reserved Windows device name and cannot be used"
+        )
+    return name
 
 
 # The four source cells (ItemID, ItemName, Price, Inventory) of a Stock sheet
@@ -151,6 +228,51 @@ class Tender:
     method: str
     amount: Money
     tendered: Money | None = None
+
+
+def validate_settlement(tenders: list[Tender], total: Money) -> None:
+    """Check a settlement against the payment rules (CONTEXT.md: Split
+    settlement).
+
+    The single settlement-validation rule, shared by live settlement (the
+    facade raises `InvalidSettlement`) and stored Sale reconstruction (the
+    persistence boundary translates failures to `CorruptRecordError`).
+    """
+    if not tenders:
+        raise InvalidSettlement("A settlement needs at least one tender")
+    for tender in tenders:
+        if tender.method not in (CASH, OCTOPUS, VOUCHER):
+            raise InvalidSettlement(f"Unknown tender method: {tender.method!r}")
+        if not tender.amount.is_finite():
+            raise InvalidSettlement("A tender amount must be a finite number")
+        if tender.amount <= 0:
+            raise InvalidSettlement("A tender amount must be positive")
+        if tender.method == CASH:
+            if tender.tendered is None:
+                raise InvalidSettlement(
+                    "Cash tendered must be recorded for a cash tender"
+                )
+            if not tender.tendered.is_finite():
+                raise InvalidSettlement("Cash tendered must be a finite number")
+            if tender.tendered < tender.amount:
+                raise InvalidSettlement(
+                    "Cash tendered cannot be less than the cash portion"
+                )
+    tender_total = sum((t.amount for t in tenders), Decimal("0"))
+    if tender_total != total:
+        raise InvalidSettlement(
+            f"Tenders total {tender_total} but the sale is {total}"
+        )
+    octopus = [t for t in tenders if t.method == OCTOPUS]
+    if octopus and len(octopus) > 1:
+        raise InvalidSettlement("A sale can have only one Octopus tender")
+    if octopus:
+        if len(tenders) != 1:
+            raise InvalidSettlement("Octopus must settle the full sale on its own")
+        if octopus[0].amount != total:
+            raise InvalidSettlement(
+                "Octopus must equal the full sale amount; partial Octopus is rejected"
+            )
 
 
 @dataclass

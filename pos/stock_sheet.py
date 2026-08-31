@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
-from .domain import CatalogError, Item, SourceCells, money
+from .domain import CatalogError, InvalidMoney, Item, SourceCells, money
 
 STOCK_SHEET_HEADER = [
     "ItemID",
@@ -44,8 +44,10 @@ def load_catalog(path: str | Path) -> LoadedCatalog:
     """Validate a Stock sheet CSV and return its items and preserved source cells.
 
     Rejects a missing/wrong header, an empty or item-less file, a missing or
-    duplicate Item ID, a missing or blank ItemName, a non-numeric Price, and an
-    invalid Inventory. Pre-filled Sales/Revenue values are ignored.
+    duplicate Item ID, a missing or blank ItemName, a non-numeric, non-finite,
+    or negative Price, a data row wider than the six-column contract, an
+    invalid Inventory, and files that are not valid UTF-8 or that fail to
+    parse. Pre-filled Sales/Revenue values are ignored.
     """
     try:
         with open(path, newline="", encoding="utf-8-sig") as handle:
@@ -53,6 +55,12 @@ def load_catalog(path: str | Path) -> LoadedCatalog:
             rows = list(reader)
     except OSError as exc:
         raise CatalogError(f"Could not read the Stock sheet CSV: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise CatalogError(
+            f"Stock sheet CSV is not valid UTF-8: {exc}"
+        ) from exc
+    except csv.Error as exc:
+        raise CatalogError(f"Could not parse the Stock sheet CSV: {exc}") from exc
 
     if not rows:
         raise CatalogError("Stock sheet CSV is empty")
@@ -67,29 +75,45 @@ def load_catalog(path: str | Path) -> LoadedCatalog:
     items: list[Item] = []
     source_cells: dict[str, SourceCells] = {}
     seen_ids: set[str] = set()
-    for row in rows[1:]:
+    for row_number, row in enumerate(rows[1:], start=2):
         cells = [cell.strip() for cell in row]
         if not any(cells):
             continue
         item_id = cells[0]
         if not item_id:
-            raise CatalogError(f"Row is missing an Item ID: {cells!r}")
+            raise CatalogError(
+                f"Row {row_number} is missing an Item ID: {cells!r}"
+            )
         if item_id in seen_ids:
             raise CatalogError(f"Duplicate Item ID: {item_id!r}")
         seen_ids.add(item_id)
 
+        if len(cells) > len(STOCK_SHEET_HEADER):
+            raise CatalogError(
+                f"Row {row_number} for item {item_id!r} has {len(cells)} "
+                f"columns; the Stock sheet has exactly {len(STOCK_SHEET_HEADER)}"
+            )
+
         name = cells[1] if len(cells) > 1 else ""
         if not name:
-            raise CatalogError(f"Row is missing an ItemName: {cells!r}")
+            raise CatalogError(
+                f"Row {row_number} is missing an ItemName: {cells!r}"
+            )
 
         if len(cells) < 3 or not cells[2]:
-            raise CatalogError(f"Row is missing a price: {cells!r}")
+            raise CatalogError(
+                f"Row {row_number} is missing a price: {cells!r}"
+            )
         try:
             price = money(cells[2])
-        except CatalogError:
+        except InvalidMoney:
             raise CatalogError(
                 f"Price for item {item_id!r} is not a number: {cells[2]!r}"
             ) from None
+        if price < 0:
+            raise CatalogError(
+                f"Price for item {item_id!r} cannot be negative"
+            )
 
         inventory_text = cells[3] if len(cells) > 3 else ""
         quantity: int | None = None

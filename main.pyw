@@ -1,7 +1,9 @@
 """DBS Garden Fete POS launcher.
 
 Double-clickable on Windows (no console window). Copy this whole folder to
-each laptop; the local database is created next to this file.
+each laptop; the local database and the failure log are created next to this
+file. A startup failure (e.g. the device database cannot be opened) shows a
+window and is written to the local log instead of failing silently.
 """
 
 from __future__ import annotations
@@ -11,16 +13,48 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from pos import diagnostics
+from pos.diagnostics import LogSource
+from pos.domain import CorruptRecordError, PosError
 from pos.facade import PosSession
+from pos.fatal import fatal_error
 from pos.sqlite import SqlitePersistence
-from pos.ui.app import PosApp
 
 
 def main() -> None:
-    db_path = Path(__file__).resolve().parent / "pos.db"
-    session = PosSession(SqlitePersistence(db_path))
-    app = PosApp(session)
-    app.mainloop()
+    app_dir = Path(__file__).resolve().parent
+    diagnostics.set_log_dir(app_dir)
+    db_path = app_dir / "pos.db"
+    try:
+        # The app shell pulls in customtkinter; imported inside the guard so a
+        # broken dependency surfaces through the fatal dialog, not silently.
+        from pos.ui.app import PosApp
+
+        session = PosSession(SqlitePersistence(db_path))
+        app = PosApp(session)
+        app.mainloop()
+    except CorruptRecordError as exc:
+        diagnostics.log_failure(
+            LogSource.DEVICE_DATABASE, f"corrupt records: {exc}"
+        )
+        fatal_error(
+            "The device database contains records the app cannot read.\n\n"
+            f"{exc}\n\n"
+            f"Details were written to:\n{diagnostics.log_path()}"
+        )
+    except PosError as exc:
+        diagnostics.log_failure(LogSource.DEVICE_DATABASE, str(exc))
+        fatal_error(
+            "The device database could not be opened or read.\n\n"
+            f"{exc}\n\n"
+            f"Details were written to:\n{diagnostics.log_path()}"
+        )
+    except Exception as exc:  # noqa: BLE001  # record any unhandled failure
+        diagnostics.log_failure(LogSource.APP, str(exc), detail=repr(exc))
+        fatal_error(
+            "The app hit an unexpected problem and could not continue.\n\n"
+            f"Details were written to:\n{diagnostics.log_path()}"
+        )
 
 
 if __name__ == "__main__":

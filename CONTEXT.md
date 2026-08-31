@@ -105,7 +105,7 @@ CSV file(s) produced from each device containing that device's sales, given to t
 _Avoid_: Report, sync, sales file
 
 **Device name**:
-A short label given to a device at setup (e.g. "Till A"). Stamped on every sale that device records and carried into its sales export, so the two devices' exports can be told apart.
+A short label given to a device at setup (e.g. "Till A"). Stamped on every sale that device records and carried into its sales export, so the two devices' exports can be told apart. A Device name must be safe to embed in a file name — the register rejects names that would break the export — because it names the export's Stock sheet report file.
 _Avoid_: Till label, register id
 
 **End-of-day**:

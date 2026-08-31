@@ -60,10 +60,13 @@ class SqlitePersistence:
         found = False
         for row in self._conn.execute("SELECT key, value FROM settings"):
             if row["key"] == "device_name":
-                settings.device_name = row["value"]
+                if row["value"]:
+                    settings.device_name = sqlite_records.parse_device_name(
+                        row["value"], "Settings (device_name)"
+                    )
                 found = True
             elif row["key"] == "float":
-                settings.float_amount = sqlite_records.parse_money(
+                settings.float_amount = sqlite_records.parse_float(
                     row["value"], "Settings (float)"
                 )
                 found = True

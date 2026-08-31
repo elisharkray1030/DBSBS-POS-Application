@@ -8,6 +8,7 @@ settings, and persists every completed sale immediately.
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Callable
 from datetime import datetime
 from decimal import Decimal
@@ -17,10 +18,9 @@ from . import reporting, stock_sheet
 from .domain import (
     CASH,
     COMPLETED,
-    OCTOPUS,
     VOIDED,
-    VOUCHER,
     CashAdjustment,
+    ExportError,
     InvalidSettlement,
     Item,
     ItemNotFound,
@@ -36,43 +36,12 @@ from .domain import (
     SetupError,
     Tender,
     money,
+    validate_device_name,
+    validate_settlement,
 )
+from .persistence import Persistence
 
 Clock = Callable[[], datetime]
-
-
-def _validate_tenders(tenders: list[Tender], total: Decimal) -> None:
-    if not tenders:
-        raise InvalidSettlement("A settlement needs at least one tender")
-    for tender in tenders:
-        if tender.method not in (CASH, OCTOPUS, VOUCHER):
-            raise InvalidSettlement(f"Unknown tender method: {tender.method!r}")
-        if tender.amount <= 0:
-            raise InvalidSettlement("A tender amount must be positive")
-        if tender.method == CASH:
-            if tender.tendered is None:
-                raise InvalidSettlement(
-                    "Cash tendered must be recorded for a cash tender"
-                )
-            if tender.tendered < tender.amount:
-                raise InvalidSettlement(
-                    "Cash tendered cannot be less than the cash portion"
-                )
-    tender_total = sum((t.amount for t in tenders), Decimal("0"))
-    if tender_total != total:
-        raise InvalidSettlement(
-            f"Tenders total {tender_total} but the sale is {total}"
-        )
-    octopus = [t for t in tenders if t.method == OCTOPUS]
-    if octopus and len(octopus) > 1:
-        raise InvalidSettlement("A sale can have only one Octopus tender")
-    if octopus:
-        if len(tenders) != 1:
-            raise InvalidSettlement("Octopus must settle the full sale on its own")
-        if octopus[0].amount != total:
-            raise InvalidSettlement(
-                "Octopus must equal the full sale amount; partial Octopus is rejected"
-            )
 
 
 def _change_due(tenders: list[Tender]) -> Decimal:
@@ -87,8 +56,8 @@ def _change_due(tenders: list[Tender]) -> Decimal:
 
 
 class PosSession:
-    def __init__(self, persistence, clock: Clock | None = None) -> None:
-        self._persistence = persistence
+    def __init__(self, persistence: Persistence, clock: Clock | None = None) -> None:
+        self._persistence: Persistence = persistence
         self._clock: Clock = clock or datetime.now
         self._settings = persistence.load_settings() or Settings()
         self._current_items: list[LineItem] = []
@@ -98,11 +67,22 @@ class PosSession:
     def _now(self) -> datetime:
         return self._clock()
 
-    def _save_settings(self) -> None:
-        self._persistence.save_settings(self._settings)
+    def _commit_settings(self, candidate: Settings) -> None:
+        """Persist a candidate settings state, adopting it only on success.
+
+        Every settings mutation builds a candidate, saves it to the device
+        database, and swaps the live settings in only once the write is
+        accepted — so a failed write can never leave the running session
+        ahead of what is actually stored (spec #81, ticket 05).
+        """
+        self._persistence.save_settings(candidate)
+        self._settings = candidate
 
     def _find_item(self, item_id: str) -> Item:
-        item = self._settings.item_by_id(item_id)
+        return self._find_item_in(self._settings, item_id)
+
+    def _find_item_in(self, settings: Settings, item_id: str) -> Item:
+        item = settings.item_by_id(item_id)
         if item is None:
             raise ItemNotFound(f"No item with ID {item_id!r} in the catalog")
         return item
@@ -114,24 +94,25 @@ class PosSession:
     # -- setup --------------------------------------------------------------
 
     def set_device_name(self, name: str) -> None:
-        name = name.strip()
-        if not name:
-            raise SetupError("Device name cannot be empty")
-        self._settings.device_name = name
-        self._save_settings()
+        name = validate_device_name(name)
+        candidate = copy.deepcopy(self._settings)
+        candidate.device_name = name
+        self._commit_settings(candidate)
 
     def set_float(self, amount: str | Decimal | float) -> None:
         value = money(amount)
         if value < 0:
             raise SetupError("Float cannot be negative")
-        self._settings.float_amount = value
-        self._save_settings()
+        candidate = copy.deepcopy(self._settings)
+        candidate.float_amount = value
+        self._commit_settings(candidate)
 
     def load_catalog(self, path: str | Path) -> int:
         loaded = stock_sheet.load_catalog(path)
-        self._settings.catalog = loaded.items
-        self._settings.source_cells = loaded.source_cells
-        self._save_settings()
+        candidate = copy.deepcopy(self._settings)
+        candidate.catalog = loaded.items
+        candidate.source_cells = loaded.source_cells
+        self._commit_settings(candidate)
         return len(loaded.items)
 
     def is_configured(self) -> bool:
@@ -167,12 +148,14 @@ class PosSession:
         return stocks
 
     def mark_sold_out(self, item_id: str) -> None:
-        self._find_item(item_id).sold_out = True
-        self._save_settings()
+        candidate = copy.deepcopy(self._settings)
+        self._find_item_in(candidate, item_id).sold_out = True
+        self._commit_settings(candidate)
 
     def unmark_sold_out(self, item_id: str) -> None:
-        self._find_item(item_id).sold_out = False
-        self._save_settings()
+        candidate = copy.deepcopy(self._settings)
+        self._find_item_in(candidate, item_id).sold_out = False
+        self._commit_settings(candidate)
 
     def is_sold_out(self, item_id: str) -> bool:
         return self._find_item(item_id).sold_out
@@ -230,7 +213,7 @@ class PosSession:
         if not self._current_items:
             raise InvalidSettlement("The current sale has no items")
         total = self.current_sale_total()
-        _validate_tenders(tenders, total)
+        validate_settlement(tenders, total)
         seq = self._persistence.next_sale_sequence()
         now = self._now()
         sale = Sale(
@@ -275,7 +258,7 @@ class PosSession:
         if not line_items:
             raise InvalidSettlement("A corrected sale must have items")
         total = sum((line.total for line in line_items), Decimal("0"))
-        _validate_tenders(tenders, total)
+        validate_settlement(tenders, total)
         corrected = Sale(
             seq=existing.seq,
             created_at=existing.created_at,
@@ -348,15 +331,21 @@ class PosSession:
 
     def export_csv(self, directory: str | Path) -> list[Path]:
         self._require_configured()
-        paths = reporting.write_export(
-            directory=directory,
-            sales=self._persistence.get_sales(),
-            catalog=self._settings.catalog,
-            source_cells=self._settings.source_cells,
-            device_name=self._settings.device_name,
-        )
-        self._settings.last_export_at = self._now()
-        self._save_settings()
+        try:
+            paths = reporting.write_export(
+                directory=directory,
+                sales=self._persistence.get_sales(),
+                catalog=self._settings.catalog,
+                source_cells=self._settings.source_cells,
+                device_name=self._settings.device_name,
+            )
+        except OSError as exc:
+            # The UI boundary: no raw OSError may reach the dialog layer, even
+            # if write_export misses a filesystem path (spec #65).
+            raise ExportError(f"Export failed: {exc}") from exc
+        candidate = copy.deepcopy(self._settings)
+        candidate.last_export_at = self._now()
+        self._commit_settings(candidate)
         return paths
 
     # -- wipe ---------------------------------------------------------------

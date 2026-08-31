@@ -11,7 +11,7 @@ from decimal import Decimal
 
 import pytest
 
-from pos.domain import CatalogError, ItemStock, SetupError
+from pos.domain import CatalogError, InvalidMoney, ItemStock, SetupError
 from pos.facade import PosSession
 from pos.persistence import InMemoryPersistence
 
@@ -27,11 +27,33 @@ def test_device_name_required(session):
     assert session.device_name() == "Till B"
 
 
+@pytest.mark.parametrize(
+    "name",
+    ["../evil", "a/b", "CON", "NUL.txt", "COM1", "Till*A", "Till:A", "x" * 245],
+)
+def test_set_device_name_rejects_names_unsafe_for_the_export_file(session, name):
+    with pytest.raises(SetupError):
+        session.set_device_name(name)
+
+
+def test_set_device_name_trims_and_stores_a_valid_name(session):
+    session.set_device_name("  Till A.  ")
+    assert session.device_name() == "Till A"
+
+
 def test_float_rejects_negative(session):
     with pytest.raises(SetupError):
         session.set_float(-1)
     session.set_float("0")
     assert session.float_amount() == Decimal("0")
+
+
+def test_float_rejects_non_finite(session):
+    with pytest.raises(InvalidMoney):
+        session.set_float(Decimal("NaN"))
+    with pytest.raises(InvalidMoney):
+        session.set_float("Infinity")
+    assert session.float_amount() is None
 
 
 def test_catalog_loads_items_with_prices_and_quantities(session, catalog_file):

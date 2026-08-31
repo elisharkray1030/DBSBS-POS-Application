@@ -326,6 +326,103 @@ def test_corrupt_settings_value_raises_corrupt_record_error(adapter):
         db.load_settings()
 
 
+def test_unknown_sale_status_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO sales (seq, status, created_at, updated_at, device_name,"
+        " line_items, tenders)"
+        " VALUES (1, 'cancelled', '2026-08-15T09:00:00', '2026-08-15T09:00:00',"
+        " 'Till A', '[{\"item_id\": \"MUG\", \"item_name\": \"Mug\","
+        " \"quantity\": 1, \"price\": \"60\"}]',"
+        " '[{\"method\": \"cash\", \"amount\": \"60\", \"tendered\": \"60\"}]')"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="status"):
+        db.get_sales()
+
+
+def test_unknown_tender_method_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO sales (seq, status, created_at, updated_at, device_name,"
+        " line_items, tenders)"
+        " VALUES (1, 'completed', '2026-08-15T09:00:00', '2026-08-15T09:00:00',"
+        " 'Till A', '[{\"item_id\": \"MUG\", \"item_name\": \"Mug\","
+        " \"quantity\": 1, \"price\": \"60\"}]',"
+        " '[{\"method\": \"card\", \"amount\": \"60\"}]')"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="method"):
+        db.get_sales()
+
+
+def test_non_string_line_item_identifier_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO sales (seq, status, created_at, updated_at, device_name,"
+        " line_items, tenders)"
+        " VALUES (1, 'completed', '2026-08-15T09:00:00', '2026-08-15T09:00:00',"
+        " 'Till A', '[{\"item_id\": 123, \"item_name\": \"Mug\","
+        " \"quantity\": 1, \"price\": \"60\"}]',"
+        " '[{\"method\": \"cash\", \"amount\": \"60\", \"tendered\": \"60\"}]')"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="item id"):
+        db.get_sales()
+
+
+def test_non_string_line_item_name_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO sales (seq, status, created_at, updated_at, device_name,"
+        " line_items, tenders)"
+        " VALUES (1, 'completed', '2026-08-15T09:00:00', '2026-08-15T09:00:00',"
+        " 'Till A', '[{\"item_id\": \"MUG\", \"item_name\": 123,"
+        " \"quantity\": 1, \"price\": \"60\"}]',"
+        " '[{\"method\": \"cash\", \"amount\": \"60\", \"tendered\": \"60\"}]')"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="item name"):
+        db.get_sales()
+
+
+def test_empty_device_name_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO sales (seq, status, created_at, updated_at, device_name,"
+        " line_items, tenders)"
+        " VALUES (1, 'completed', '2026-08-15T09:00:00', '2026-08-15T09:00:00',"
+        " '', '[{\"item_id\": \"MUG\", \"item_name\": \"Mug\","
+        " \"quantity\": 1, \"price\": \"60\"}]',"
+        " '[{\"method\": \"cash\", \"amount\": \"60\", \"tendered\": \"60\"}]')"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="device name"):
+        db.get_sales()
+
+
+def test_empty_catalog_name_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO catalog (item_id, name, price)"
+        " VALUES ('MUG', '', '60')"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="name"):
+        db.load_settings()
+
+
+def test_empty_catalog_item_id_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO catalog (item_id, name, price)"
+        " VALUES ('', 'Mug', '60')"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="item id"):
+        db.load_settings()
+
+
 def test_corrupt_catalog_price_raises_corrupt_record_error(adapter):
     db = adapter()
     db._conn.execute(
@@ -333,6 +430,39 @@ def test_corrupt_catalog_price_raises_corrupt_record_error(adapter):
     )
     db._conn.commit()
     with pytest.raises(CorruptRecordError):
+        db.load_settings()
+
+
+def test_non_integer_starting_quantity_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO catalog (item_id, name, price, starting_quantity)"
+        " VALUES ('MUG', 'Mug', '60', 'abc')"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="starting quantity"):
+        db.load_settings()
+
+
+def test_non_integer_sold_out_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO catalog (item_id, name, price, sold_out)"
+        " VALUES ('MUG', 'Mug', '60', 'yes')"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="sold-out flag"):
+        db.load_settings()
+
+
+def test_out_of_range_sold_out_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO catalog (item_id, name, price, sold_out)"
+        " VALUES ('MUG', 'Mug', '60', 2)"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="sold-out flag"):
         db.load_settings()
 
 
@@ -358,11 +488,246 @@ def test_source_cells_of_wrong_shape_raise_corrupt_record_error(adapter):
         db.load_settings()
 
 
+# -- interrupted setup and stored optional Float (spec #81, ticket 03) -----
+
+
+def test_empty_stored_float_reads_as_unset(adapter):
+    db = adapter()
+    db._conn.execute("INSERT INTO settings (key, value) VALUES ('float', '')")
+    db._conn.commit()
+    settings = db.load_settings()
+    assert settings is not None
+    assert settings.float_amount is None
+
+
+def test_negative_stored_float_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute("INSERT INTO settings (key, value) VALUES ('float', '-5')")
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="float"):
+        db.load_settings()
+
+
+def test_non_finite_stored_float_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute("INSERT INTO settings (key, value) VALUES ('float', 'NaN')")
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="float"):
+        db.load_settings()
+
+
+def test_empty_stored_device_name_reads_as_unset(adapter):
+    db = adapter()
+    db._conn.execute("INSERT INTO settings (key, value) VALUES ('device_name', '')")
+    db._conn.commit()
+    settings = db.load_settings()
+    assert settings is not None
+    assert settings.device_name == ""
+
+
+def test_whitespace_stored_device_name_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute("INSERT INTO settings (key, value) VALUES ('device_name', '   ')")
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="device name"):
+        db.load_settings()
+
+
+# -- stored catalog and sale domain invariants (spec #81, ticket 04) -------
+
+
+def test_negative_catalog_price_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO catalog (item_id, name, price) VALUES ('MUG', 'Mug', '-5')"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="price"):
+        db.load_settings()
+
+
+def test_negative_starting_quantity_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO catalog (item_id, name, price, starting_quantity)"
+        " VALUES ('MUG', 'Mug', '60', -5)"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="starting quantity"):
+        db.load_settings()
+
+
+def _sale_row(seq, quantity, price="60", tenders_amount="60", tendered="60"):
+    return (
+        seq,
+        "completed",
+        "2026-08-15T09:00:00",
+        "2026-08-15T09:00:00",
+        "Till A",
+        f'[{{"item_id": "MUG", "item_name": "Mug", "quantity": {quantity}, "price": "{price}"}}]',
+        f'[{{"method": "cash", "amount": "{tenders_amount}", "tendered": "{tendered}"}}]',
+    )
+
+
+def _insert_sale(adapter, *args):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO sales (seq, status, created_at, updated_at, device_name,"
+        " line_items, tenders) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        args,
+    )
+    db._conn.commit()
+    return db
+
+
+def test_fractional_sale_quantity_raises_corrupt_record_error(adapter):
+    db = _insert_sale(adapter, *_sale_row(1, "2.5"))
+    with pytest.raises(CorruptRecordError, match="quantity"):
+        db.get_sales()
+
+
+def test_negative_sale_quantity_raises_corrupt_record_error(adapter):
+    db = _insert_sale(adapter, *_sale_row(1, "-1"))
+    with pytest.raises(CorruptRecordError, match="quantity"):
+        db.get_sales()
+
+
+def test_zero_sale_quantity_raises_corrupt_record_error(adapter):
+    db = _insert_sale(adapter, *_sale_row(1, "0"))
+    with pytest.raises(CorruptRecordError, match="quantity"):
+        db.get_sales()
+
+
+def test_string_sale_quantity_raises_corrupt_record_error(adapter):
+    db = _insert_sale(adapter, *_sale_row(1, '"2"'))
+    with pytest.raises(CorruptRecordError, match="quantity"):
+        db.get_sales()
+
+
+def test_negative_tender_amount_raises_corrupt_record_error(adapter):
+    db = _insert_sale(adapter, *_sale_row(1, 1, tenders_amount="-60"))
+    with pytest.raises(CorruptRecordError, match="settlement"):
+        db.get_sales()
+
+
+def test_tender_total_mismatch_raises_corrupt_record_error(adapter):
+    db = _insert_sale(adapter, *_sale_row(1, 1, tenders_amount="50"))
+    with pytest.raises(CorruptRecordError, match="settlement"):
+        db.get_sales()
+
+
+def test_cash_tender_without_tendered_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO sales (seq, status, created_at, updated_at, device_name,"
+        " line_items, tenders)"
+        " VALUES (1, 'completed', '2026-08-15T09:00:00', '2026-08-15T09:00:00',"
+        " 'Till A',"
+        ' \'[{"item_id": "MUG", "item_name": "Mug", "quantity": 1, "price": "60"}]\','
+        " '[{\"method\": \"cash\", \"amount\": \"60\"}]')"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="settlement"):
+        db.get_sales()
+
+
+def test_octopus_partial_sale_raises_corrupt_record_error(adapter):
+    db = adapter()
+    db._conn.execute(
+        "INSERT INTO sales (seq, status, created_at, updated_at, device_name,"
+        " line_items, tenders)"
+        " VALUES (1, 'completed', '2026-08-15T09:00:00', '2026-08-15T09:00:00',"
+        " 'Till A',"
+        ' \'[{"item_id": "MUG", "item_name": "Mug", "quantity": 1, "price": "60"}]\','
+        " '[{\"method\": \"octopus\", \"amount\": \"30\"}]')"
+    )
+    db._conn.commit()
+    with pytest.raises(CorruptRecordError, match="settlement"):
+        db.get_sales()
+
+
 def test_non_database_file_raises_persistence_error(tmp_path):
     bad = tmp_path / "bad.db"
     bad.write_text("this is not a sqlite database")
     with pytest.raises(PersistenceError):
         SqlitePersistence(bad)
+
+
+# -- rollback and write atomicity on failure -------------------------------
+
+
+def _settings_with(item_ids):
+    return Settings(
+        device_name="Till A",
+        float_amount=Decimal("500"),
+        catalog=[
+            Item(item_id=item_id, name=item_id, price=Decimal("60"))
+            for item_id in item_ids
+        ],
+    )
+
+
+def test_failed_settings_catalog_save_rolls_back_to_prior_state(adapter):
+    db = adapter()
+    db.save_settings(_settings_with(["MUG", "BDG"]))
+    db._conn.execute(
+        "CREATE TRIGGER sabotage_catalog BEFORE INSERT ON catalog"
+        " BEGIN SELECT RAISE(ABORT, 'sabotaged'); END;"
+    )
+    db._conn.commit()
+    replacement = Settings(
+        device_name="Till B",
+        float_amount=Decimal("600"),
+        catalog=[Item(item_id="PLUSH", name="Plush", price=Decimal("120"))],
+    )
+    with pytest.raises(PersistenceError):
+        db.save_settings(replacement)
+    after = db.load_settings()
+    assert after is not None
+    assert after.device_name == "Till A"
+    assert after.float_amount == Decimal("500")
+    assert [i.item_id for i in after.catalog] == ["MUG", "BDG"]
+
+
+def test_failed_sale_write_leaves_no_partial_sale(adapter):
+    db = adapter()
+    db.save_sale(_sale(1, 2))
+    db._conn.execute(
+        "CREATE TRIGGER sabotage_sales BEFORE INSERT ON sales"
+        " BEGIN SELECT RAISE(ABORT, 'sabotaged'); END;"
+    )
+    db._conn.commit()
+    with pytest.raises(PersistenceError):
+        db.save_sale(_sale(2, 1))
+    assert [s.seq for s in db.get_sales()] == [1]
+
+
+def test_failed_cash_adjustment_write_leaves_no_partial_adjustment(adapter):
+    db = adapter()
+    db.save_cash_adjustment(
+        CashAdjustment(
+            amount=Decimal("100"),
+            reason="Topping up change",
+            created_at=datetime(2026, 8, 15, 9, 30, 0),
+        )
+    )
+    db._conn.execute(
+        "CREATE TRIGGER sabotage_adjustments BEFORE INSERT ON cash_adjustments"
+        " BEGIN SELECT RAISE(ABORT, 'sabotaged'); END;"
+    )
+    db._conn.commit()
+    with pytest.raises(PersistenceError):
+        db.save_cash_adjustment(
+            CashAdjustment(
+                amount=Decimal("-50"),
+                reason="Removing change",
+                created_at=datetime(2026, 8, 15, 10, 0, 0),
+            )
+        )
+    adjustments = db.get_cash_adjustments()
+    assert len(adjustments) == 1
+    assert adjustments[0].amount == Decimal("100")
+    assert adjustments[0].reason == "Topping up change"
 
 
 # -- sequence and wipe contracts --------------------------------------------
