@@ -25,7 +25,7 @@ from pos.ui import style
 
 # The item list's column set, as it should read after the Status column goes.
 ITEM_COLUMNS = ("item_id", "name", "price", "remaining")
-ITEM_HEADINGS = ("ID", "Item", "Price", "Remaining")
+ITEM_HEADINGS = ("ID", "Item", "Price", "Stock")
 
 
 @contextmanager
