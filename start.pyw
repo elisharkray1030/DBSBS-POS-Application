@@ -19,7 +19,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-APP_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from pos import launch
+
+APP_DIR = launch.app_dir()
 
 
 def dependency_ready() -> bool:
