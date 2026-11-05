@@ -33,7 +33,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install test dependencies
-        run: python -m pip install "customtkinter==6.0.0" pytest mypy ruff
+        run: python -m pip install -r requirements-dev.txt
 
       - name: Run tests
         run: python -m pytest -q

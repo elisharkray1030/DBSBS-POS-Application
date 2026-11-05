@@ -22,18 +22,67 @@ Runs on two Windows laptops with no network and no installer.
   exports are written next to the executable. Keep the extracted folder for
   the event so the data stays with that device.
 
-## Run from source (developers)
+## Clone and run from source (Windows)
 
-- Install Python 3.11+ for Windows and copy or clone this folder.
-- Double-click `start.pyw`. No console window appears. On first launch it
-  installs the pinned `customtkinter` dependency if needed; do this once while
-  connected to the internet. On later offline launches it starts directly.
-- The source-run device database (`pos.db`) is created next to the launcher.
-- On first run, the setup screen asks for the Stock sheet CSV, starting float,
-  and device name.
+The source-run workflow is for development and rehearsal. The application is
+targeted and tested on 64-bit Windows; event laptops should use the packaged
+release above. Before cloning on a fresh laptop, install or confirm:
 
-From a Windows terminal, run `python start.pyw` (the dependency-bootstrapping
-launcher) or `python main.pyw` (direct launch when dependencies are installed).
+- **64-bit Windows 10 or newer.** The source-run app is targeted and tested on
+  Windows; macOS and Linux are not supported deployment targets.
+- **Git for Windows**, including the `git` command-line tool
+  ([download](https://git-scm.com/download/win)). No GitHub account is needed
+  to clone this public repository.
+- **64-bit Python 3.11 or newer for Windows** ([download](https://www.python.org/downloads/windows/)).
+  Ensure the Python Launcher (`py`) and Tcl/Tk (`tkinter`) are installed; these
+  are options in the Python installer. Python is needed for the source-run app.
+- **Internet access for initial setup** to reach GitHub and install Python
+  packages from PyPI. After dependencies are installed, the app runs offline.
+- **A writable folder** for the clone, since the source app stores its local
+  database and log in the repository folder.
+
+PowerShell is included with Windows. No IDE, C/C++ compiler, database server,
+or administrator account is required. Before proceeding, these commands should
+work in a new PowerShell window:
+
+```powershell
+git --version
+py -3 --version
+```
+
+In PowerShell, clone the repository and create an isolated environment:
+
+```powershell
+git clone https://github.com/elisharkray1030/DBSBS-POS-Application.git
+cd DBSBS-POS-Application
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe start.pyw
+```
+
+The requirements install the pinned `customtkinter` runtime dependency and the
+tools used for tests, type checking, and linting. To install only the app's
+runtime dependency, use
+`.\.venv\Scripts\python.exe -m pip install "customtkinter==6.0.0"` instead.
+Alternatively, `start.pyw` installs that pinned dependency automatically when
+it is missing, so the first launch still needs internet access. Once installed,
+the source app can run offline. Use `start.pyw` as the normal launcher; it
+surfaces startup errors and logs them. `main.pyw` is the direct launcher and
+assumes the dependency is already installed.
+
+The source-run device database (`pos.db`) and failure log (`pos.log`) are
+created in the repository folder, which must be writable. Do not commit or
+share those local files. On first run, the setup screen asks for the
+organizer's Stock sheet CSV, starting float, and device name. No account,
+credentials, server, or network configuration is needed by the app.
+
+To run the automated checks after installing `requirements-dev.txt`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m mypy pos
+.\.venv\Scripts\python.exe -m ruff check pos tests main.pyw start.pyw
+```
 
 ## Diagnostics
 
@@ -101,11 +150,5 @@ automated tests. The app-data path helper has unit tests, and the release
 workflow smoke-tests the packaged Windows executable by checking that it stays
 open and creates `pos.db` beside itself; this does not replace a visual
 rehearsal on the event laptops.
-
-```bash
-python -m pytest -q            # full suite
-python -m mypy pos             # typecheck
-python -m ruff check pos tests main.pyw start.pyw   # lint
-```
 
 See `docs/spec.md`, `CONTEXT.md`, and `docs/adr/` for the domain decisions.
