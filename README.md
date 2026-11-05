@@ -3,28 +3,45 @@
 An offline point-of-sale application for a single stall at the DBS Garden Fete.
 Runs on two Windows laptops with no network and no installer.
 
-## Run it
+## Download & install (event laptops)
 
-- Install Python 3.11+ for Windows.
-- Copy this whole folder to each laptop.
+- Download the latest `DBSGardenFetePOS-v<tag>-windows.zip` from the
+  [GitHub Releases page](https://github.com/elisharkray1030/DBSBS-POS-Application/releases/latest).
+- Extract the zip to a writable folder, such as Documents. Do not run it from
+  `Program Files` or a OneDrive-synced folder.
+- Double-click `DBSGardenFetePOS.exe`. No console window appears. The app
+  includes Python and its dependencies; no Python installation or internet
+  connection is needed.
+- The executable is unsigned. If Windows SmartScreen says **Windows protected
+  your PC**, choose **More info** → **Run anyway**.
+- On first run, the **setup screen** asks for the organizer's Stock sheet CSV
+  (`ItemID, ItemName, Price, Inventory, Sales, Revenue`), starting float, and
+  device name (e.g. "Till A"). After setup, the **sale screen** is the main
+  working screen.
+- The device database (`pos.db`), failure log (`pos.log`), and end-of-day
+  exports are written next to the executable. Keep the extracted folder for
+  the event so the data stays with that device.
+
+## Run from source (developers)
+
+- Install Python 3.11+ for Windows and copy or clone this folder.
 - Double-click `start.pyw`. No console window appears. On first launch it
-  installs the one external dependency (`customtkinter`, the tested version)
-  if needed — do this once per laptop while connected to the internet — then
-  launches the app. On event day (no internet) the dependency is already
-  installed and the script goes straight to launching. The local database
-  (`pos.db`) is created next to the launcher on first run.
-- On first run you reach the **setup screen**: load the organizer's Stock sheet
-  CSV (`ItemID, ItemName, Price, Inventory, Sales, Revenue`), enter the
-  starting float, and name the device (e.g. "Till A"). After that the
-  **sale screen** is the main working screen.
+  installs the pinned `customtkinter` dependency if needed; do this once while
+  connected to the internet. On later offline launches it starts directly.
+- The source-run device database (`pos.db`) is created next to the launcher.
+- On first run, the setup screen asks for the Stock sheet CSV, starting float,
+  and device name.
 
-Alternatively run `python start.pyw` or `python main.pyw` from a terminal.
+From a Windows terminal, run `python start.pyw` (the dependency-bootstrapping
+launcher) or `python main.pyw` (direct launch when dependencies are installed).
 
 ## Diagnostics
 
 If something goes wrong on event day, the app records it locally — no console
 or internet needed — in a `pos.log` file next to `pos.db` in the app folder.
 
+- The bootstrap details below apply only to the source-run workflow. The
+  packaged executable already includes its dependency and does not run pip.
 - **First-run setup** verifies that the tested `customtkinter` release
   imports; an installed wrong or broken version is replaced, and a pip run is
   only treated as successful once the pinned version actually imports. Do
@@ -79,8 +96,11 @@ reports by hand. See `docs/adr/0003-stock-sheet-round-trip.md`.
 ## Development
 
 The core logic is tested through a single seam, the POS session facade, with
-an in-memory backing. The production app uses SQLite. The tkinter UI and
-Windows glue are intentionally untested.
+an in-memory backing. The production app uses SQLite. The tkinter UI has no
+automated tests. The app-data path helper has unit tests, and the release
+workflow smoke-tests the packaged Windows executable by checking that it stays
+open and creates `pos.db` beside itself; this does not replace a visual
+rehearsal on the event laptops.
 
 ```bash
 python -m pytest -q            # full suite

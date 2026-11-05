@@ -1,0 +1,173 @@
+name: Windows release
+
+on:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version tag to publish (for example, v1.0.0); select an existing tag to rebuild it
+        required: true
+        type: string
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+
+jobs:
+  checks:
+    name: Tests and static checks
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: python -m pip install "customtkinter==6.0.0" pytest mypy ruff
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Type-check
+        run: python -m mypy pos
+
+      - name: Lint
+        run: python -m ruff check pos tests main.pyw start.pyw
+
+  build:
+    name: Build and smoke-test Windows executable
+    needs: checks
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate release tag
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_EVENT_NAME -eq "workflow_dispatch") {
+            if ($env:GITHUB_REF_TYPE -eq "tag") {
+              if ($env:RELEASE_TAG -ne $env:GITHUB_REF_NAME) {
+                throw "When dispatching from a tag, the version input must match the selected tag."
+              }
+            }
+            else {
+              git ls-remote --exit-code --refs origin "refs/tags/$($env:RELEASE_TAG)" | Out-Null
+              $tagLookupExitCode = $LASTEXITCODE
+              if ($tagLookupExitCode -eq 0) {
+                throw "That release tag already exists. Dispatch against the existing tag to rebuild it."
+              }
+              if ($tagLookupExitCode -ne 2) {
+                throw "Could not check whether the requested release tag already exists."
+              }
+            }
+          }
+          if ($env:RELEASE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$') {
+            throw "Release tag must be a version such as v1.0.0."
+          }
+
+      - name: Build executable
+        shell: pwsh
+        run: ./packaging/build.ps1
+
+      - name: Smoke-test executable and data location
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path "dist/DBSGardenFetePOS.exe").Path
+          $database = Join-Path (Split-Path -Parent $exe) "pos.db"
+          if (Test-Path -LiteralPath $database) {
+            Remove-Item -LiteralPath $database -Force
+          }
+
+          $process = Start-Process -FilePath $exe -PassThru
+          try {
+            $deadline = (Get-Date).AddSeconds(30)
+            while (-not (Test-Path -LiteralPath $database) -and (Get-Date) -lt $deadline) {
+              $process.Refresh()
+              if ($process.HasExited) {
+                throw "The executable exited before creating pos.db (exit code $($process.ExitCode))."
+              }
+              Start-Sleep -Seconds 1
+            }
+
+            if (-not (Test-Path -LiteralPath $database)) {
+              throw "The executable did not create pos.db beside itself within 30 seconds."
+            }
+
+            Start-Sleep -Seconds 5
+            $process.Refresh()
+            if ($process.HasExited) {
+              throw "The executable exited after creating pos.db (exit code $($process.ExitCode))."
+            }
+          }
+          finally {
+            $process.Refresh()
+            if (-not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force
+              Wait-Process -Id $process.Id -Timeout 10 -ErrorAction SilentlyContinue
+            }
+          }
+
+      - name: Package executable and checksum
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $archiveName = "DBSGardenFetePOS-$env:RELEASE_TAG-windows.zip"
+          $archivePath = Join-Path "dist" $archiveName
+          Compress-Archive -LiteralPath "dist/DBSGardenFetePOS.exe" `
+            -DestinationPath $archivePath -CompressionLevel Optimal -Force
+          $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $archiveName" | Set-Content -LiteralPath "$archivePath.sha256" -Encoding ascii
+
+      - name: Upload release assets
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: |
+            dist/DBSGardenFetePOS-${{ env.RELEASE_TAG }}-windows.zip
+            dist/DBSGardenFetePOS-${{ env.RELEASE_TAG }}-windows.zip.sha256
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: release-assets
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
+          name: DBS Garden Fete POS ${{ env.RELEASE_TAG }}
+          files: |
+            release-assets/DBSGardenFetePOS-${{ env.RELEASE_TAG }}-windows.zip
+            release-assets/DBSGardenFetePOS-${{ env.RELEASE_TAG }}-windows.zip.sha256
+          fail_on_unmatched_files: true
