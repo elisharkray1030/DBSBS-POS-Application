@@ -40,6 +40,8 @@ launcher) or `python main.pyw` (direct launch when dependencies are installed).
 If something goes wrong on event day, the app records it locally — no console
 or internet needed — in a `pos.log` file next to `pos.db` in the app folder.
 
+- The bootstrap details below apply only to the source-run workflow. The
+  packaged executable already includes its dependency and does not run pip.
 - **First-run setup** verifies that the tested `customtkinter` release
   imports; an installed wrong or broken version is replaced, and a pip run is
   only treated as successful once the pinned version actually imports. Do
