@@ -4,10 +4,13 @@ on:
   push:
     tags:
       - "v*"
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       version:
-        description: Existing version tag to build and publish (for example, v1.0.0)
+        description: Version tag to publish (for example, v1.0.0); select an existing tag to rebuild it
         required: true
         type: string
 
@@ -41,12 +44,12 @@ jobs:
       - name: Lint
         run: python -m ruff check pos tests main.pyw start.pyw
 
-  release:
-    name: Build and publish Windows executable
+  build:
+    name: Build and smoke-test Windows executable
     needs: checks
     runs-on: windows-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -57,6 +60,7 @@ jobs:
           python-version: "3.11"
 
       - name: Validate release tag
+        if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           if ($env:GITHUB_EVENT_NAME -eq "workflow_dispatch") {
@@ -123,6 +127,7 @@ jobs:
           }
 
       - name: Package executable and checksum
+        if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           $archiveName = "DBSGardenFetePOS-$env:RELEASE_TAG-windows.zip"
@@ -132,6 +137,30 @@ jobs:
           $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $archiveName" | Set-Content -LiteralPath "$archivePath.sha256" -Encoding ascii
 
+      - name: Upload release assets
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: |
+            dist/DBSGardenFetePOS-${{ env.RELEASE_TAG }}-windows.zip
+            dist/DBSGardenFetePOS-${{ env.RELEASE_TAG }}-windows.zip.sha256
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: release-assets
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -139,6 +168,6 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: DBS Garden Fete POS ${{ env.RELEASE_TAG }}
           files: |
-            dist/DBSGardenFetePOS-${{ env.RELEASE_TAG }}-windows.zip
-            dist/DBSGardenFetePOS-${{ env.RELEASE_TAG }}-windows.zip.sha256
+            release-assets/DBSGardenFetePOS-${{ env.RELEASE_TAG }}-windows.zip
+            release-assets/DBSGardenFetePOS-${{ env.RELEASE_TAG }}-windows.zip.sha256
           fail_on_unmatched_files: true
