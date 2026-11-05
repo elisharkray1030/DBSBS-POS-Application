@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from pos import diagnostics
+from pos import diagnostics, launch
 from pos.diagnostics import LogSource
 from pos.domain import CorruptRecordError, PosError
 from pos.facade import PosSession
@@ -22,7 +22,7 @@ from pos.sqlite import SqlitePersistence
 
 
 def main() -> None:
-    app_dir = Path(__file__).resolve().parent
+    app_dir = launch.app_dir()
     diagnostics.set_log_dir(app_dir)
     db_path = app_dir / "pos.db"
     try:
