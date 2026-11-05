@@ -52,6 +52,7 @@ def test_pre_source_cells_database_is_migrated(sqlite_store_factory, clock, tmp_
 
     store = SqlitePersistence(legacy)
     session = PosSession(store, clock=clock)
+    assert session.stock_sheet_filename() is None
     session.set_device_name("Till A")
     session.set_float(500)
     report = [p for p in session.export_csv(tmp_path) if p.name.startswith("stocks-")]
@@ -157,6 +158,7 @@ def test_sqlite_backing_round_trips_and_wipe(
     assert reopened.is_configured() is True
     assert reopened.device_name() == "Till A"
     assert reopened.float_amount() == Decimal("500")
+    assert reopened.stock_sheet_filename() == "messy.csv"
     assert reopened.is_sold_out("BDG") is True
     sale = reopened.get_sale(1)
     assert sale.total == Decimal("120")

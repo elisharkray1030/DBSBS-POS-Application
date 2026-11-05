@@ -49,11 +49,11 @@ The hand-written order sheet given to the customer at the point of sale. Written
 _Avoid_: Order sheet, slip
 
 **Catalog**:
-The full list of items and their fixed prices, loaded into the app before the event from the organizer's Stock sheet CSV. Fully read-only during the event — the app never adds or edits items in-app.
+The full list of items and their fixed prices, loaded from the organizer's active Stock sheet CSV. The operator may select a different Stock sheet during the event; the app never adds items or edits item data/prices in-app.
 _Avoid_: Menu, product list
 
 **Stock sheet**:
-The organizer's master CSV listing every item, with columns `ItemID, ItemName, Price, Inventory, Sales, Revenue`. Loaded into the app as the catalog before the event; at the end of the day each device writes out a new report file with the same columns, filling only its own Sales and Revenue (the source file is left untouched), and the organizer combines the two devices' reports by hand.
+The organizer's master CSV listing every item, with columns `ItemID, ItemName, Price, Inventory, Sales, Revenue`. The active sheet supplies the catalog and source cells; the operator may change it during the event. At the end of the day each device writes out a new report file with the same columns, filling Sales and Revenue from retained completed sales (the source file is left untouched), and the organizer combines the two devices' reports by hand.
 _Avoid_: Stocks file, stock list
 
 **Source cells**:

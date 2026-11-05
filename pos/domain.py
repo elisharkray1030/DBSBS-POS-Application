@@ -324,6 +324,7 @@ class Settings:
     catalog: list[Item] = field(default_factory=list)
     source_cells: dict[str, SourceCells] = field(default_factory=dict)
     last_export_at: datetime | None = None
+    stock_sheet_filename: str | None = None
 
     @property
     def is_configured(self) -> bool:

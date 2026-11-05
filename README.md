@@ -48,25 +48,40 @@ or internet needed — in a `pos.log` file next to `pos.db` in the app folder.
 ## Stock sheet round-trip
 
 The organizer's master CSV is both the app's catalog input and the shape of its
-end-of-day report. The catalog is loaded once from the Stock sheet and is
-**read-only** — there is no in-app way to add an item or change a price.
-At the end of the day each device exports its completed Stock sheet report
-(`stocks-<device>.csv`) with the same six columns and one row per catalog item
-in the master file's order; only `Sales` (units sold, final state, excluding
-voids) and `Revenue` (actually-recorded settled value) are filled. The master
-file itself is never modified, and the organizer merges the two devices'
-reports by hand. See `docs/adr/0003-stock-sheet-round-trip.md`.
+end-of-day report. The active Stock sheet filename is shown on the Sale and
+End-of-day screens. Use **Change stock sheet…** on the Sale screen to select
+another valid CSV; the catalog and prices for future sales then come from that
+sheet. Items and prices cannot be edited in-app. A change is blocked while the
+current sale has items; settle it or remove the items first.
+
+Changing sheets does not alter recorded sales: each sale keeps its original
+item name and price, so the day's history can contain prices from more than one
+sheet. The Stock sheet report uses the active sheet's row order and source
+cells, while Sales and Revenue reflect the retained completed-sale history by
+Item ID. Switching sheets invalidates a prior export; export again before
+wiping recorded session data. The source filename (not its full path) is saved
+with the device database. A configured device still resumes directly to Sale
+on launch, using its saved catalog instead of rereading the CSV. Older
+databases without a recorded filename show **Source not recorded** until a
+sheet is selected. The master CSV itself is never modified, and the organizer
+merges the two devices' reports by hand. See
+`docs/adr/0003-stock-sheet-round-trip.md` and
+`docs/adr/0007-active-stock-sheet-switching.md`.
 
 ## Screens
 
-- **Setup** — load the Stock sheet CSV, enter the float, name the device.
+- **Setup** — load/select the Stock sheet CSV, enter the float, name the device.
 - **Sale** — scrollable item list with Item IDs, live remaining counts and
   sold-out dimming, running total, settle by cash / voucher / Octopus /
-  cash+voucher, cash adjustments, corrections and voids.
+  cash+voucher, cash adjustments, corrections and voids; view/change the active
+  Stock sheet.
 - **End of day** — expected cash (float + cash sales + adjustments), Octopus
   total, voucher total, per-item sold counts, voids list; export three files
   (`sales.csv`, `items.csv`, and the device's Stock sheet report) and wipe the
   database for the end of the event (type `wipe` to confirm).
+
+See [`docs/manual-acceptance.md`](docs/manual-acceptance.md) for the UI acceptance
+checklist.
 
 ## Tenders
 

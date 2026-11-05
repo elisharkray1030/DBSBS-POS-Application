@@ -108,10 +108,24 @@ class PosSession:
         self._commit_settings(candidate)
 
     def load_catalog(self, path: str | Path) -> int:
+        if self._current_items:
+            raise SetupError(
+                "Cannot change the Stock sheet while the current sale has items. "
+                "Settle the current sale or remove all items first."
+            )
         loaded = stock_sheet.load_catalog(path)
+        filename = Path(path).name
         candidate = copy.deepcopy(self._settings)
+        catalog_changed = (
+            candidate.catalog != loaded.items
+            or candidate.source_cells != loaded.source_cells
+            or candidate.stock_sheet_filename != filename
+        )
         candidate.catalog = loaded.items
         candidate.source_cells = loaded.source_cells
+        candidate.stock_sheet_filename = filename
+        if catalog_changed:
+            candidate.last_export_at = None
         self._commit_settings(candidate)
         return len(loaded.items)
 
@@ -123,6 +137,9 @@ class PosSession:
 
     def float_amount(self) -> Decimal | None:
         return self._settings.float_amount
+
+    def stock_sheet_filename(self) -> str | None:
+        return self._settings.stock_sheet_filename
 
     # -- catalog / items ----------------------------------------------------
 
@@ -365,9 +382,12 @@ class PosSession:
                 else max(latest_record, adjustment.created_at)
             )
         last_export = self._settings.last_export_at
-        if latest_record is not None and (last_export is None or last_export < latest_record):
+        if self._settings.is_configured and (
+            last_export is None
+            or (latest_record is not None and last_export < latest_record)
+        ):
             raise PosError(
-                "Wipe blocked: take the end-of-day export first so no sale is lost."
+                "Wipe blocked: take the end-of-day export first so no session data is lost."
             )
         self._persistence.wipe()
         self._settings = Settings()

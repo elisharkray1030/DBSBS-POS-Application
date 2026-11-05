@@ -31,8 +31,10 @@ column join on `ItemID`.
 - `ItemID` is the item's canonical identity; the loader rejects a missing or
   duplicate Item ID and a wrong header (including the old `Name, Price, Quantity`
   header). Pre-filled `Sales`/`Revenue` values in the loaded file are ignored.
-- The catalog is read-only once loaded: the add-item and fix-price operations
-  are removed from the session interface and every UI affordance for them.
+- Catalog contents are read-only in-app: the add-item and fix-price operations
+  are removed from the session interface and every UI affordance for them. The
+  operator may select another valid Stock sheet during the event; see
+  `0007-active-stock-sheet-switching.md` for how that preserves sale history.
 - The end-of-day export writes a third file, `stocks-<device>.csv`, alongside
   `sales.csv` and `items.csv`: one row per catalog item in master-file order
   with the same six columns, `ItemID`/`ItemName`/`Price`/`Inventory` passed

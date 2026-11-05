@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox, ttk
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
 
 import customtkinter as ctk  # type: ignore[import-untyped]
 
@@ -50,6 +51,19 @@ class SaleScreen(ctk.CTkFrame):
         ctk.CTkButton(
             top, text="Cash adjustment", width=150, command=self._open_adjustment
         ).pack(side="right", padx=4)
+
+        sheet_row = ctk.CTkFrame(self, fg_color="transparent")
+        sheet_row.pack(fill="x", padx=12, pady=(4, 0))
+        self.stock_sheet_var = tk.StringVar()
+        ctk.CTkLabel(
+            sheet_row, textvariable=self.stock_sheet_var, anchor="w"
+        ).pack(side="left", fill="x", expand=True)
+        ctk.CTkButton(
+            sheet_row,
+            text="Change stock sheet…",
+            width=180,
+            command=self._change_stock_sheet,
+        ).pack(side="right")
 
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=12, pady=8)
@@ -128,6 +142,10 @@ class SaleScreen(ctk.CTkFrame):
     # -- actions ------------------------------------------------------------
 
     def refresh(self) -> None:
+        filename = self.session.stock_sheet_filename()
+        self.stock_sheet_var.set(
+            f"Stock sheet: {filename}" if filename else "Stock sheet: Source not recorded"
+        )
         self.item_tree.delete(*self.item_tree.get_children())
         for stock in self.session.list_items():
             remaining = "—" if stock.remaining is None else str(stock.remaining)
@@ -283,3 +301,46 @@ class SaleScreen(ctk.CTkFrame):
         dialog = AdjustmentDialog(self, self.session)
         run_dialog(dialog)
         self.refresh()
+
+    def _change_stock_sheet(self) -> None:
+        if self.session.current_sale_items():
+            messagebox.showwarning(
+                "Current sale is not empty",
+                "Settle the current sale or remove all its items before changing "
+                "the Stock sheet.",
+                parent=self,
+            )
+            return
+
+        chosen = filedialog.askopenfilename(
+            parent=self,
+            title="Choose a Stock sheet CSV",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+        )
+        if not chosen:
+            return
+
+        filename = Path(chosen).name
+        if not messagebox.askyesno(
+            "Change Stock sheet?",
+            f"Use {filename} as the active Stock sheet?\n\n"
+            "New sales will use its item data and prices, and the end-of-day "
+            "Stock sheet report will use its rows and order. Recorded sales "
+            "will be retained at their original prices. This can result in "
+            "historical and new sales using different prices.",
+            parent=self,
+        ):
+            return
+
+        try:
+            count = self.session.load_catalog(chosen)
+        except (PosError, OSError, ValueError) as exc:
+            show_error("Cannot change Stock sheet", exc, LogSource.CHANGE_STOCK_SHEET)
+            return
+
+        self.refresh()
+        messagebox.showinfo(
+            "Stock sheet changed",
+            f"Loaded {count} items from {filename}.",
+            parent=self,
+        )

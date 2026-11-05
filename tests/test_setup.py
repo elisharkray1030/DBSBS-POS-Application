@@ -59,6 +59,7 @@ def test_float_rejects_non_finite(session):
 def test_catalog_loads_items_with_prices_and_quantities(session, catalog_file):
     count = session.load_catalog(catalog_file)
     assert count == 3
+    assert session.stock_sheet_filename() == "catalog.csv"
     items = session.list_items()
     assert [i.item_id for i in items] == ["MUG", "BDG", "PLUSH"]
     assert [i.name for i in items] == ["Mug", "Badge", "Plush Bear"]

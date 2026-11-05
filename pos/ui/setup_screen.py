@@ -36,6 +36,8 @@ class SetupScreen(ctk.CTkFrame):
         row = ctk.CTkFrame(self)
         row.pack(fill="x", padx=24, pady=(4, 2))
         self.csv_path = tk.StringVar()
+        existing_filename = self.session.stock_sheet_filename()
+        self.csv_path.set(existing_filename or "")
         ctk.CTkEntry(
             row, textvariable=self.csv_path, width=320
         ).pack(side="left", padx=(0, 8))
@@ -67,7 +69,13 @@ class SetupScreen(ctk.CTkFrame):
             padx=24, pady=(8, 16)
         )
 
-        self._loaded = False
+        existing_items = self.session.list_items()
+        self._loaded = bool(existing_items)
+        if self._loaded:
+            source = existing_filename or "Source not recorded"
+            self.csv_status.set(
+                f"Loaded {len(existing_items)} items. Stock sheet: {source}"
+            )
 
     def _browse(self) -> None:
         chosen = filedialog.askopenfilename(

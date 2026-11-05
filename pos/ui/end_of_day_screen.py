@@ -27,6 +27,17 @@ class EndOfDayScreen(ctk.CTkFrame):
             top, text="Back to sales", width=120, command=self.app.show_sale
         ).pack(side="right")
 
+        filename = self.session.stock_sheet_filename()
+        ctk.CTkLabel(
+            self,
+            text=(
+                f"Stock sheet: {filename}"
+                if filename
+                else "Stock sheet: Source not recorded"
+            ),
+            anchor="w",
+        ).pack(fill="x", padx=16, pady=(6, 0))
+
         figures = self.session.end_of_day()
 
         self._section(self, "Cash").pack(fill="x", padx=16, pady=(12, 4))
