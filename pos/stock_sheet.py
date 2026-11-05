@@ -167,6 +167,8 @@ def build_report_rows(
         cells = source_cells.get(item.item_id)
         if cells is not None:
             passthrough = list(cells)
+            # Catalog edits supersede the source values; the session removes
+            # the preserved source row when an item is edited.
         else:
             inventory = (
                 str(item.starting_quantity)

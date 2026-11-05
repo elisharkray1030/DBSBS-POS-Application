@@ -24,6 +24,20 @@ sales unchanged. A successful change clears the last-export timestamp so the
 existing wipe safeguard requires an export based on the new active sheet
 before recorded sales can be wiped.
 
+The operator may edit the active catalog's item name, price, and starting
+Inventory from the Sale screen, but may not add or remove Item IDs. Edits are
+stored in the device database, never written back to the selected source CSV,
+and are blocked while the current sale has items. Future sale lines use edited
+values; historical sale snapshots do not change. Inventory edits set a new
+starting baseline, with remaining quantity computed as that baseline minus all
+completed non-void units sold for the Item ID in the shared event history,
+clamped at zero for display. If the recalculated remaining quantity is
+positive, an Inventory edit clears that item's manual sold-out flag. Catalog
+edits invalidate the previous export just like a sheet switch. The explicit
+end-of-day export uses the edited active catalog values for its Stock sheet
+rows and actual recorded history for Sales and Revenue; the selected source
+file remains untouched.
+
 ## Considered options
 
 - **Keep the first-loaded catalog for the whole event** — rejected: organizers
@@ -46,5 +60,5 @@ before recorded sales can be wiped.
   historical sale snapshots and transaction-derived totals remain unchanged.
 - Changing the catalog/source invalidates a previous export. The operator must
   export again before wiping the device.
-- The catalog remains read-only in-app: selecting a different valid source is
-  allowed, but adding items or editing prices is not.
+- Selecting a different valid source is allowed, and existing catalog rows can
+  be edited in-app; adding or removing Item IDs is not supported.

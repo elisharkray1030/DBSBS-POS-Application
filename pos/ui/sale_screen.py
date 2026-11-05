@@ -64,6 +64,12 @@ class SaleScreen(ctk.CTkFrame):
             width=180,
             command=self._change_stock_sheet,
         ).pack(side="right")
+        ctk.CTkButton(
+            sheet_row,
+            text="Edit item…",
+            width=110,
+            command=self._edit_item,
+        ).pack(side="right", padx=4)
 
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=12, pady=8)
@@ -204,6 +210,22 @@ class SaleScreen(ctk.CTkFrame):
             show_error("Cannot change sold-out", exc, LogSource.SOLD_OUT)
         self.refresh()
 
+    def _edit_item(self) -> None:
+        item_id = self._selected_item_id()
+        if item_id is None:
+            messagebox.showinfo("No selection", "Select an item to edit.", parent=self)
+            return
+        if self.session.current_sale_items():
+            messagebox.showwarning(
+                "Current sale is not empty",
+                "Settle the current sale or remove all its items before editing an item.",
+                parent=self,
+            )
+            return
+        dialog = EditCatalogItemDialog(self, self.session, item_id)
+        run_dialog(dialog)
+        self.refresh()
+
     def _selected_sale_item_id(self):
         selection = self.sale_tree.selection()
         if not selection:
@@ -324,10 +346,10 @@ class SaleScreen(ctk.CTkFrame):
         if not messagebox.askyesno(
             "Change Stock sheet?",
             f"Use {filename} as the active Stock sheet?\n\n"
-            "New sales will use its item data and prices, and the end-of-day "
-            "Stock sheet report will use its rows and order. Recorded sales "
-            "will be retained at their original prices. This can result in "
-            "historical and new sales using different prices.",
+            "This replaces active names, prices, and starting inventory. "
+            "Recorded sales stay in shared history at their original prices. "
+            "Matching IDs subtract earlier event sales from the new inventory. "
+            "Export again before wiping.",
             parent=self,
         ):
             return
@@ -344,3 +366,58 @@ class SaleScreen(ctk.CTkFrame):
             f"Loaded {count} items from {filename}.",
             parent=self,
         )
+
+
+class EditCatalogItemDialog(ctk.CTkToplevel):
+    """Edit an existing active catalog row; sale snapshots are unaffected."""
+
+    def __init__(self, master, session, item_id: str) -> None:
+        super().__init__(master)
+        self.session = session
+        stock = next(item for item in session.list_items() if item.item_id == item_id)
+        self.item_id = item_id
+        self.title(f"Edit item {item_id}")
+        ctk.CTkLabel(
+            self,
+            text=(
+                "Changes apply to future sales. Inventory is the starting "
+                "quantity; recorded sales are deducted."
+            ),
+            wraplength=360,
+        ).grid(row=0, column=0, columnspan=2, padx=12, pady=(12, 8))
+        ctk.CTkLabel(self, text="Item name:").grid(row=1, column=0, sticky="e", padx=8)
+        self.name = ctk.CTkEntry(self, width=260)
+        self.name.insert(0, stock.name)
+        self.name.grid(row=1, column=1, padx=8, pady=4)
+        ctk.CTkLabel(self, text="Price:").grid(row=2, column=0, sticky="e", padx=8)
+        self.price = ctk.CTkEntry(self, width=120)
+        self.price.insert(0, str(stock.price))
+        self.price.grid(row=2, column=1, sticky="w", padx=8, pady=4)
+        ctk.CTkLabel(self, text="Starting inventory:").grid(
+            row=3, column=0, sticky="e", padx=8
+        )
+        self.inventory = ctk.CTkEntry(self, width=120)
+        self.inventory.insert(
+            0, "" if stock.starting_quantity is None else str(stock.starting_quantity)
+        )
+        self.inventory.grid(row=3, column=1, sticky="w", padx=8, pady=4)
+        ctk.CTkButton(self, text="Save", command=self._save).grid(
+            row=4, column=0, columnspan=2, padx=12, pady=12
+        )
+
+    def _save(self) -> None:
+        inventory_text = self.inventory.get().strip()
+        try:
+            inventory = None if not inventory_text else int(inventory_text)
+            if inventory_text and str(inventory) != inventory_text:
+                raise ValueError("Inventory must be a whole number")
+            self.session.edit_catalog_item(
+                self.item_id,
+                name=self.name.get(),
+                price=self.price.get(),
+                starting_quantity=inventory,
+            )
+        except (PosError, ValueError) as exc:
+            show_error("Cannot edit item", exc, LogSource.CHANGE_STOCK_SHEET)
+            return
+        self.destroy()

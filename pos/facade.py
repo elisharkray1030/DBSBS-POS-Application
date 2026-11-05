@@ -124,10 +124,67 @@ class PosSession:
         candidate.catalog = loaded.items
         candidate.source_cells = loaded.source_cells
         candidate.stock_sheet_filename = filename
+        if loaded.items:
+            sold = reporting.aggregate_sold_and_revenue(
+                self._persistence.get_sales()
+            )
+            for item in candidate.catalog:
+                remaining = (
+                    None
+                    if item.starting_quantity is None
+                    else item.starting_quantity
+                    - sold.get(item.item_id, (0, Decimal("0")))[0]
+                )
+                if remaining is not None and remaining > 0:
+                    item.sold_out = False
         if catalog_changed:
             candidate.last_export_at = None
         self._commit_settings(candidate)
         return len(loaded.items)
+
+    def edit_catalog_item(
+        self,
+        item_id: str,
+        *,
+        name: str,
+        price: str | Decimal | float,
+        starting_quantity: int | None,
+    ) -> None:
+        """Edit an active catalog row without changing recorded sale snapshots."""
+        if self._current_items:
+            raise SetupError(
+                "Cannot edit catalog items while the current sale has items. "
+                "Settle the current sale or remove all items first."
+            )
+        name = name.strip()
+        if not name:
+            raise SetupError("Item name cannot be empty")
+        item_price = money(price)
+        if item_price < 0:
+            raise SetupError("Price cannot be negative")
+        if starting_quantity is not None:
+            try:
+                starting_quantity = int(starting_quantity)
+            except (TypeError, ValueError) as exc:
+                raise SetupError("Inventory must be a whole number") from exc
+            if starting_quantity < 0:
+                raise SetupError("Inventory cannot be negative")
+
+        candidate = copy.deepcopy(self._settings)
+        item = self._find_item_in(candidate, item_id)
+        item.name = name
+        item.price = item_price
+        item.starting_quantity = starting_quantity
+        sold = reporting.aggregate_sold_and_revenue(self._persistence.get_sales())
+        units_sold = sold.get(item_id, (0, Decimal("0")))[0]
+        remaining = (
+            None if starting_quantity is None else starting_quantity - units_sold
+        )
+        if remaining is not None and remaining > 0:
+            item.sold_out = False
+        candidate.source_cells.pop(item_id, None)
+        candidate.last_export_at = None
+        self._commit_settings(candidate)
 
     def is_configured(self) -> bool:
         return self._settings.is_configured
@@ -149,9 +206,11 @@ class PosSession:
         for item in self._settings.catalog:
             remaining = None
             if item.starting_quantity is not None:
-                remaining = item.starting_quantity - sold.get(
-                    item.item_id, (0, Decimal("0"))
-                )[0]
+                remaining = max(
+                    0,
+                    item.starting_quantity
+                    - sold.get(item.item_id, (0, Decimal("0")))[0],
+                )
             stocks.append(
                 ItemStock(
                     item_id=item.item_id,

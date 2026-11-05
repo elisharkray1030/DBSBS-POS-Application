@@ -85,6 +85,117 @@ def test_switch_keeps_historical_prices_and_uses_active_report_source(
     ]
 
 
+def test_switch_uses_incoming_inventory_minus_shared_event_sales_and_clears_sold_out(
+    configured_session, tmp_path
+):
+    first = _write_sheet(tmp_path / "first.csv", ["MUG", "Mug", "60", "20"])
+    second = _write_sheet(tmp_path / "second.csv", ["MUG", "Mug", "75", "22"])
+    configured_session.load_catalog(first)
+    configured_session.add_item_to_sale("MUG", 3)
+    configured_session.settle_current_sale(
+        [Tender(CASH, Decimal("180"), tendered=Decimal("180"))]
+    )
+    configured_session.mark_sold_out("MUG")
+
+    configured_session.load_catalog(second)
+
+    stock = configured_session.list_items()[0]
+    assert stock.starting_quantity == 22
+    assert stock.remaining == 19
+    assert stock.sold_out is False
+
+
+def test_switch_clamps_negative_remaining_to_zero_and_keeps_sold_out(
+    configured_session, tmp_path
+):
+    first = _write_sheet(tmp_path / "first.csv", ["MUG", "Mug", "60", "20"])
+    second = _write_sheet(tmp_path / "second.csv", ["MUG", "Mug", "75", "2"])
+    configured_session.load_catalog(first)
+    configured_session.add_item_to_sale("MUG", 3)
+    configured_session.settle_current_sale(
+        [Tender(CASH, Decimal("180"), tendered=Decimal("180"))]
+    )
+
+    configured_session.load_catalog(second)
+
+    stock = configured_session.list_items()[0]
+    assert stock.remaining == 0
+    assert stock.sold_out is False
+
+
+def test_manual_catalog_edits_apply_to_future_sales_and_exported_source_values(
+    configured_session, tmp_path
+):
+    source = _write_sheet(tmp_path / "active.csv", ["MUG", "Mug", "60", "20"])
+    configured_session.load_catalog(source)
+    configured_session.add_item_to_sale("MUG", 1)
+    configured_session.settle_current_sale(
+        [Tender(CASH, Decimal("60"), tendered=Decimal("60"))]
+    )
+    configured_session.mark_sold_out("MUG")
+
+    configured_session.edit_catalog_item(
+        "MUG", name="Mug updated", price="70", starting_quantity=22
+    )
+    stock = configured_session.list_items()[0]
+    assert (stock.name, stock.price, stock.starting_quantity, stock.remaining) == (
+        "Mug updated", Decimal("70"), 22, 21
+    )
+    assert stock.sold_out is False
+    assert configured_session.get_sale(1).line_items[0].price == Decimal("60")
+
+    report = [
+        path
+        for path in configured_session.export_csv(tmp_path)
+        if path.name.startswith("stocks-")
+    ]
+    assert _read_rows(report[0])[1] == [
+        "MUG", "Mug updated", "70", "22", "1", "60"
+    ]
+    # Editing the active catalog must not mutate the selected source file.
+    assert _read_rows(source)[1] == ["MUG", "Mug", "60", "20", "0", "0"]
+
+
+def test_catalog_edit_requires_empty_current_sale_and_invalidates_export(
+    configured_session, tmp_path
+):
+    configured_session.export_csv(tmp_path)
+    configured_session.add_item_to_sale("MUG", 1)
+    with pytest.raises(SetupError, match="Settle the current sale"):
+        configured_session.edit_catalog_item(
+            "MUG", name="Mug", price="70", starting_quantity=20
+        )
+    configured_session.begin_sale()
+    configured_session.edit_catalog_item(
+        "MUG", name="Mug", price="70", starting_quantity=20
+    )
+    with pytest.raises(PosError, match="Wipe blocked"):
+        configured_session.wipe()
+
+
+def test_catalog_edit_validation_and_persistence_failure_are_atomic(
+    clock, tmp_path
+):
+    store = _FailingSettingsStore()
+    session = PosSession(store, clock=clock)
+    sheet = _write_sheet(tmp_path / "source.csv", ["MUG", "Mug", "60", "20"])
+    session.set_device_name("Till A")
+    session.set_float(500)
+    session.load_catalog(sheet)
+    session.export_csv(tmp_path)
+    with pytest.raises(SetupError, match="cannot be empty"):
+        session.edit_catalog_item(
+            "MUG", name="  ", price="70", starting_quantity=20
+        )
+    store.fail_saves = True
+    with pytest.raises(PersistenceError):
+        session.edit_catalog_item(
+            "MUG", name="New name", price="70", starting_quantity=20
+        )
+    assert session.list_items()[0].name == "Mug"
+    session.wipe()  # failed edit did not invalidate the prior export
+
+
 def test_invalid_sheet_leaves_active_catalog_and_sales_unchanged(
     session, tmp_path
 ):

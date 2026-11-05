@@ -117,8 +117,11 @@ The organizer's master CSV is both the app's catalog input and the shape of its
 end-of-day report. The active Stock sheet filename is shown on the Sale and
 End-of-day screens. Use **Change stock sheet…** on the Sale screen to select
 another valid CSV; the catalog and prices for future sales then come from that
-sheet. Items and prices cannot be edited in-app. A change is blocked while the
-current sale has items; settle it or remove the items first.
+sheet. Use **Edit item…** to change an existing item's name, price, or starting
+inventory in the local device database. Edits affect future sales only and do
+not modify the selected source CSV; Item IDs cannot be added or removed. A
+change or edit is blocked while the current sale has items; settle it or remove
+the items first.
 
 Changing sheets does not alter recorded sales: each sale keeps its original
 item name and price, so the day's history can contain prices from more than one
