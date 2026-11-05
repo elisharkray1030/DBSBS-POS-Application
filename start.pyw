@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from importlib.machinery import SourceFileLoader
+from importlib.util import module_from_spec, spec_from_loader
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -105,9 +107,19 @@ def launch() -> int:
     from pos.fatal import fatal_error
 
     try:
-        import main
+        loader = SourceFileLoader("main", str(APP_DIR / "main.pyw"))
+        spec = spec_from_loader(loader.name, loader)
+        if spec is None:
+            raise ImportError("Could not load main.pyw")
+        module = module_from_spec(spec)
+        sys.modules[spec.name] = module
+        try:
+            loader.exec_module(module)
+        except Exception:
+            sys.modules.pop(spec.name, None)
+            raise
 
-        main.main()
+        module.main()
     except Exception as exc:  # noqa: BLE001  # surface any startup failure
         diagnostics.log_failure(LogSource.APP, str(exc), detail=repr(exc))
         fatal_error(

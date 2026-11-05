@@ -14,8 +14,11 @@ from __future__ import annotations
 import builtins
 import importlib.metadata
 import types
+from pathlib import Path
 
-import start
+from tests._source_loader import load_source_module
+
+start = load_source_module("start", Path(__file__).resolve().parent.parent / "start.pyw")
 
 import pos.fatal
 from pos import diagnostics
