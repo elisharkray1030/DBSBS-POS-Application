@@ -3,28 +3,94 @@
 An offline point-of-sale application for a single stall at the DBS Garden Fete.
 Runs on two Windows laptops with no network and no installer.
 
-## Run it
+## Download & install (event laptops)
 
-- Install Python 3.11+ for Windows.
-- Copy this whole folder to each laptop.
-- Double-click `start.pyw`. No console window appears. On first launch it
-  installs the one external dependency (`customtkinter`, the tested version)
-  if needed — do this once per laptop while connected to the internet — then
-  launches the app. On event day (no internet) the dependency is already
-  installed and the script goes straight to launching. The local database
-  (`pos.db`) is created next to the launcher on first run.
-- On first run you reach the **setup screen**: load the organizer's Stock sheet
-  CSV (`ItemID, ItemName, Price, Inventory, Sales, Revenue`), enter the
-  starting float, and name the device (e.g. "Till A"). After that the
-  **sale screen** is the main working screen.
+- Download the latest `DBSGardenFetePOS-v<tag>-windows.zip` from the
+  [GitHub Releases page](https://github.com/elisharkray1030/DBSBS-POS-Application/releases/latest).
+- Extract the zip to a writable folder, such as Documents. Do not run it from
+  `Program Files` or a OneDrive-synced folder.
+- Double-click `DBSGardenFetePOS.exe`. No console window appears. The app
+  includes Python and its dependencies; no Python installation or internet
+  connection is needed.
+- The executable is unsigned. If Windows SmartScreen says **Windows protected
+  your PC**, choose **More info** → **Run anyway**.
+- On first run, the **setup screen** asks for the organizer's Stock sheet CSV
+  (`ItemID, ItemName, Price, Inventory, Sales, Revenue`), starting float, and
+  device name (e.g. "Till A"). After setup, the **sale screen** is the main
+  working screen.
+- The device database (`pos.db`), failure log (`pos.log`), and end-of-day
+  exports are written next to the executable. Keep the extracted folder for
+  the event so the data stays with that device.
 
-Alternatively run `python start.pyw` or `python main.pyw` from a terminal.
+## Clone and run from source (Windows)
+
+The source-run workflow is for development and rehearsal. The application is
+targeted and tested on 64-bit Windows; event laptops should use the packaged
+release above. Before cloning on a fresh laptop, install or confirm:
+
+- **64-bit Windows 10 or newer.** The source-run app is targeted and tested on
+  Windows; macOS and Linux are not supported deployment targets.
+- **Git for Windows**, including the `git` command-line tool
+  ([download](https://git-scm.com/download/win)). No GitHub account is needed
+  to clone this public repository.
+- **64-bit Python 3.11 or newer for Windows** ([download](https://www.python.org/downloads/windows/)).
+  Ensure the Python Launcher (`py`) and Tcl/Tk (`tkinter`) are installed; these
+  are options in the Python installer. Python is needed for the source-run app.
+- **Internet access for initial setup** to reach GitHub and install Python
+  packages from PyPI. After dependencies are installed, the app runs offline.
+- **A writable folder** for the clone, since the source app stores its local
+  database and log in the repository folder.
+
+PowerShell is included with Windows. No IDE, C/C++ compiler, database server,
+or administrator account is required. Before proceeding, these commands should
+work in a new PowerShell window:
+
+```powershell
+git --version
+py -3 --version
+```
+
+In PowerShell, clone the repository and create an isolated environment:
+
+```powershell
+git clone https://github.com/elisharkray1030/DBSBS-POS-Application.git
+cd DBSBS-POS-Application
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe start.pyw
+```
+
+The requirements install the pinned `customtkinter` runtime dependency and the
+tools used for tests, type checking, and linting. To install only the app's
+runtime dependency, use
+`.\.venv\Scripts\python.exe -m pip install "customtkinter==6.0.0"` instead.
+Alternatively, `start.pyw` installs that pinned dependency automatically when
+it is missing, so the first launch still needs internet access. Once installed,
+the source app can run offline. Use `start.pyw` as the normal launcher; it
+surfaces startup errors and logs them. `main.pyw` is the direct launcher and
+assumes the dependency is already installed.
+
+The source-run device database (`pos.db`) and failure log (`pos.log`) are
+created in the repository folder, which must be writable. Do not commit or
+share those local files. On first run, the setup screen asks for the
+organizer's Stock sheet CSV, starting float, and device name. No account,
+credentials, server, or network configuration is needed by the app.
+
+To run the automated checks after installing `requirements-dev.txt`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m mypy pos
+.\.venv\Scripts\python.exe -m ruff check pos tests main.pyw start.pyw
+```
 
 ## Diagnostics
 
 If something goes wrong on event day, the app records it locally — no console
 or internet needed — in a `pos.log` file next to `pos.db` in the app folder.
 
+- The bootstrap details below apply only to the source-run workflow. The
+  packaged executable already includes its dependency and does not run pip.
 - **First-run setup** verifies that the tested `customtkinter` release
   imports; an installed wrong or broken version is replaced, and a pip run is
   only treated as successful once the pinned version actually imports. Do
@@ -94,13 +160,10 @@ checklist.
 ## Development
 
 The core logic is tested through a single seam, the POS session facade, with
-an in-memory backing. The production app uses SQLite. The tkinter UI and
-Windows glue are intentionally untested.
-
-```bash
-python -m pytest -q            # full suite
-python -m mypy pos             # typecheck
-python -m ruff check pos tests main.pyw start.pyw   # lint
-```
+an in-memory backing. The production app uses SQLite. The tkinter UI has no
+automated tests. The app-data path helper has unit tests, and the release
+workflow smoke-tests the packaged Windows executable by checking that it stays
+open and creates `pos.db` beside itself; this does not replace a visual
+rehearsal on the event laptops.
 
 See `docs/spec.md`, `CONTEXT.md`, and `docs/adr/` for the domain decisions.
