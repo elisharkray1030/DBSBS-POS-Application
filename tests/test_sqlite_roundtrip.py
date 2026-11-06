@@ -208,3 +208,32 @@ def test_catalog_edit_preserves_item_id_source_cell_after_reopen(
     assert _read_rows(report[0])[1] == [
         " MUG ", "Edited mug", "70", "25", "0", "0"
     ]
+
+
+def test_catalog_edit_preserves_unedited_source_cells_after_reopen(
+    sqlite_store_factory, clock, tmp_path
+):
+    source = tmp_path / "formatted-cells.csv"
+    source.write_text(
+        "ItemID,ItemName,Price,Inventory,Sales,Revenue\n"
+        " MUG , Mug ,60.00,020,0,0\n",
+        encoding="utf-8",
+    )
+    session = PosSession(sqlite_store_factory(), clock=clock)
+    session.set_device_name("Till A")
+    session.set_float(500)
+    session.load_catalog(source)
+    session.edit_catalog_item(
+        "MUG", name="Updated mug", price="60.00", starting_quantity=20
+    )
+
+    reopened = PosSession(sqlite_store_factory(), clock=clock)
+    report = [
+        path
+        for path in reopened.export_csv(tmp_path)
+        if path.name.startswith("stocks-")
+    ]
+
+    assert _read_rows(report[0])[1] == [
+        " MUG ", "Updated mug", "60.00", "020", "0", "0"
+    ]

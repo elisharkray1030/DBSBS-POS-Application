@@ -141,10 +141,17 @@ class PosSession:
         filename = Path(path).name
         candidate = copy.deepcopy(self._settings)
         previous_items = {item.item_id: item for item in candidate.catalog}
+        previous_catalog_data = [
+            (item.item_id, item.name, item.price, item.starting_quantity)
+            for item in candidate.catalog
+        ]
+        loaded_catalog_data = [
+            (item.item_id, item.name, item.price, item.starting_quantity)
+            for item in loaded.items
+        ]
         catalog_changed = (
-            candidate.catalog != loaded.items
+            previous_catalog_data != loaded_catalog_data
             or candidate.source_cells != loaded.source_cells
-            or candidate.stock_sheet_filename != filename
         )
         sold_by_item: dict[str, tuple[int, Decimal]] | None = None
         for item in loaded.items:
@@ -189,6 +196,7 @@ class PosSession:
 
         candidate = copy.deepcopy(self._settings)
         item = self._find_item_in(candidate, item_id)
+        previous_item = copy.deepcopy(item)
         previous_starting_quantity = item.starting_quantity
         item.name = name
         item.price = item_price
@@ -196,7 +204,9 @@ class PosSession:
         self._clear_sold_out_for_starting_quantity_change(
             item, previous_starting_quantity, None
         )
-        stock_sheet.update_source_cells_after_edit(candidate.source_cells, item)
+        stock_sheet.update_source_cells_after_edit(
+            candidate.source_cells, previous_item, item
+        )
         candidate.last_export_at = None
         self._commit_settings(candidate)
 

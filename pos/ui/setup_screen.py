@@ -85,13 +85,16 @@ class SetupScreen(ctk.CTkFrame):
         )
         if not chosen:
             return
+        previous_path = self.csv_path.get()
         self.csv_path.set(chosen)
         try:
             count = self.session.load_catalog(chosen)
         except (PosError, OSError, ValueError) as exc:
+            # The failed load left any already-saved catalog untouched, so
+            # restore the active filename and keep setup ready to start.
+            self.csv_path.set(previous_path)
             self.csv_status.set(f"Could not load: {exc}")
             diagnostics.log_failure(LogSource.SETUP_CATALOG, str(exc))
-            self._loaded = False
             return
         self.csv_status.set(f"Loaded {count} items.")
         self._loaded = True

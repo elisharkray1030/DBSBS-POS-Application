@@ -137,6 +137,36 @@ def test_switch_preserves_sold_out_when_starting_quantity_is_unchanged(
     assert configured_session.is_sold_out("MUG") is True
 
 
+def test_reloading_unchanged_sheet_with_sold_out_item_keeps_export_valid(
+    configured_session, tmp_path
+):
+    sheet = _write_sheet(tmp_path / "active.csv", ["MUG", "Mug", "60", "20"])
+    configured_session.load_catalog(sheet)
+    configured_session.export_csv(tmp_path)
+    configured_session.mark_sold_out("MUG")
+
+    configured_session.load_catalog(sheet)
+
+    assert configured_session.is_sold_out("MUG") is True
+    configured_session.wipe()
+    assert configured_session.is_configured() is False
+
+
+def test_renaming_unchanged_sheet_does_not_invalidate_export(
+    configured_session, tmp_path
+):
+    first = _write_sheet(tmp_path / "first.csv", ["MUG", "Mug", "60.00", "020"])
+    second = _write_sheet(tmp_path / "renamed.csv", ["MUG", "Mug", "60.00", "020"])
+    configured_session.load_catalog(first)
+    configured_session.export_csv(tmp_path)
+
+    configured_session.load_catalog(second)
+
+    assert configured_session.stock_sheet_filename() == "renamed.csv"
+    configured_session.wipe()
+    assert configured_session.is_configured() is False
+
+
 def test_manual_catalog_edits_apply_to_future_sales_and_exported_source_values(
     configured_session, tmp_path
 ):
@@ -170,6 +200,40 @@ def test_manual_catalog_edits_apply_to_future_sales_and_exported_source_values(
     ]
     # Editing the active catalog must not mutate the selected source file.
     assert _read_rows(source)[1] == [" MUG ", "Mug", "60", "20", "0", "0"]
+
+
+@pytest.mark.parametrize(
+    ("name", "price", "starting_quantity", "expected_source_cells"),
+    [
+        ("Updated mug", "60.00", 20, [" MUG ", "Updated mug", "60.00", "020"]),
+        ("Mug", "70", 20, [" MUG ", " Mug ", "70", "020"]),
+        ("Mug", "60.00", 25, [" MUG ", " Mug ", "60.00", "25"]),
+    ],
+    ids=["name-only", "price-only", "starting-quantity-only"],
+)
+def test_catalog_edit_preserves_unedited_source_cells(
+    configured_session,
+    tmp_path,
+    name,
+    price,
+    starting_quantity,
+    expected_source_cells,
+):
+    source = _write_sheet(
+        tmp_path / "formatted.csv", [" MUG ", " Mug ", "60.00", "020"]
+    )
+    configured_session.load_catalog(source)
+
+    configured_session.edit_catalog_item(
+        "MUG", name=name, price=price, starting_quantity=starting_quantity
+    )
+
+    report = [
+        path
+        for path in configured_session.export_csv(tmp_path)
+        if path.name.startswith("stocks-")
+    ]
+    assert _read_rows(report[0])[1][:4] == expected_source_cells
 
 
 def test_name_and_price_edits_do_not_clear_sold_out(configured_session):

@@ -5,6 +5,9 @@ checks with a disposable device database and copies of valid Stock sheet CSVs.
 
 - [ ] With a configured device database, launch `start.pyw`; it opens directly
   on Sale, without showing Setup first.
+- [ ] Resume an interrupted setup (catalog saved, no device name or float) and
+  choose an invalid CSV. The error is shown, the previous filename returns, and
+  **Start the day** still accepts the saved catalog.
 - [ ] Sale shows `Stock sheet: <filename>` and **Change stock sheet…** without
   crowding or truncating the device identity. End-of-day shows the same active
   filename.

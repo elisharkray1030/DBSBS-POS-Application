@@ -153,10 +153,12 @@ def load_catalog(path: str | Path) -> LoadedCatalog:
 
 
 def update_source_cells_after_edit(
-    source_cells: dict[str, SourceCells], item: Item
+    source_cells: dict[str, SourceCells], previous_item: Item, item: Item
 ) -> None:
     """Update editable report cells while preserving the source Item ID cell.
 
+    Source formatting for unchanged values is retained exactly; only cells
+    whose domain values changed are replaced with the edited values.
     Legacy catalogs without stored source cells continue to use the report
     builder's fallback from the edited domain item.
     """
@@ -168,9 +170,11 @@ def update_source_cells_after_edit(
     )
     source_cells[item.item_id] = (
         cells[0],
-        item.name,
-        str(item.price),
-        inventory_cell,
+        item.name if item.name != previous_item.name else cells[1],
+        str(item.price) if item.price != previous_item.price else cells[2],
+        inventory_cell
+        if item.starting_quantity != previous_item.starting_quantity
+        else cells[3],
     )
 
 
