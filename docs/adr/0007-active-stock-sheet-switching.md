@@ -25,15 +25,15 @@ existing wipe safeguard requires an export based on the new active sheet
 before recorded sales can be wiped.
 
 The operator may edit the active catalog's item name, price, and starting
-Inventory from the Sale screen, but may not add or remove Item IDs. Edits are
+quantity from the Sale screen, but may not add or remove Item IDs. Edits are
 stored in the device database, never written back to the selected source CSV,
 and are blocked while the current sale has items. Future sale lines use edited
-values; historical sale snapshots do not change. Inventory edits set a new
-starting baseline, with remaining quantity computed as that baseline minus all
+values; historical sale snapshots do not change. Starting-quantity edits set a
+new baseline, with remaining quantity computed as that baseline minus all
 completed non-void units sold for the Item ID in the shared event history,
 clamped at zero for display. If the recalculated remaining quantity is
-positive, an Inventory edit clears that item's manual sold-out flag. Catalog
-edits invalidate the previous export just like a sheet switch. The explicit
+positive, a starting-quantity edit clears that item's manual sold-out flag.
+Catalog edits invalidate the previous export just like a sheet switch. The explicit
 end-of-day export uses the edited active catalog values for its Stock sheet
 rows and actual recorded history for Sales and Revenue; the selected source
 file remains untouched.

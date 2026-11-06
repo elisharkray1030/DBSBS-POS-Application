@@ -2,8 +2,9 @@
 
 The organizer's master CSV is both the catalog input and the completed report
 shape. This module owns the whole round-trip rule: loading and validating the
-file, preserving each row's source cells verbatim, and building the report
-rows. It is the one home for that rule (architecture umbrella U1).
+file, preserving each row's source cells on load, and building report rows from
+those cells plus any device-local edits. It is the one home for that rule
+(architecture umbrella U1).
 
 The session facade calls `load_catalog` at setup and `build_report_rows` at
 export; the SQLite adapter persists the preserved source cells through the

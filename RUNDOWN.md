@@ -9,7 +9,7 @@ or automatically reset the day at end of day.
 - Prepare valid Stock sheet CSVs for both price periods. Use the expected Stock
   sheet columns and make sure each physical item has the same, unique `ItemID`
   in both sheets.
-- For items whose stock carries over, use the same **event-start inventory**
+- For items whose stock carries over, use the same **starting quantity**
   and `ItemID` in both sheets. If multiple tills sell from shared stock, use
   that same baseline on each till; each till counts only its own sales.
 - Set up each till with its device name, starting cash float, and the Saturday
@@ -44,11 +44,12 @@ changing completed sales.
 
 When an incoming sheet has the same `ItemID` as a previously sold item, the POS
 subtracts this device's completed, non-void sales for that ID from a numeric
-Inventory baseline. The Sunday Stock sheet's Sales and Revenue for that ID will
-combine Saturday and Sunday totals; Revenue reflects the prices actually charged
-on both days. Sales are not transferred to a different ID. Sales for an ID
-missing from the active sheet remain in history and the End-of-day summary, but
-will not have a row in the active Stock sheet report. A sheet change also means
+starting quantity in the `Inventory` column. The Sunday Stock sheet's Sales and
+Revenue for that ID combine Saturday and Sunday totals; Revenue reflects the
+prices actually charged on both days. Sales are not transferred to a different
+ID. Sales for an ID missing from the active sheet remain in history and the
+End-of-day summary, but will not have a row in the active Stock sheet report. A
+sheet change also means
 you must export again before the device can be wiped.
 
 ## Sunday — marked prices and end of day
@@ -76,11 +77,11 @@ Each export creates:
 
 - `sales.csv` — sale totals, tenders, status, and timestamps.
 - `items.csv` — rows for each sale line, with item name, quantity, and price,
-  associated with the sale by device and sale sequence. It does **not** include
+  associated with the sale by device and sequence number. It does **not** include
   `ItemID`.
 - `stocks-<device>.csv` — the active Stock sheet's rows, with calculated Sales
-  and Revenue for this device's retained history. Inventory is the starting
-  baseline, not a remaining-stock column.
+  and Revenue for this device's retained history. The `Inventory` column is the
+  starting-quantity baseline, not a remaining-stock column.
 
 Keep separate folders for each **day and till** (for example, `Saturday/Till A`,
 `Saturday/Till B`, `Sunday/Till A`, `Sunday/Till B`). The filenames `sales.csv`
@@ -93,27 +94,27 @@ for each day, use the sale timestamps in `sales.csv`, then match device and sale
 sequence to `items.csv`. These files retain each sale line's item name, quantity,
 and price, but not its ItemID.
 
-## Inventory: what the app can and cannot count
+## Starting quantity: what the app can and cannot estimate
 
 For each item on one device, the displayed remaining estimate is:
 
-> max(0, active Stock sheet's starting Inventory − this device's completed,
+> max(0, active Stock sheet's starting quantity − this device's completed,
 > non-void units sold for the same ItemID)
 
-Thus, with the same IDs and event-start Inventory baselines in both sheets,
-Saturday's sales remain deducted after the Sunday switch, and Sunday's estimate
-includes sales from both days. The Stock sheet export reports the Inventory
-baseline and cumulative Sales; derive remaining as Inventory minus Sales,
-clamped at zero. A blank Inventory means the app cannot estimate remaining
-stock for that item.
+Thus, when both sheets use the same starting quantity from the `Inventory`
+column, Saturday's sales remain deducted after the Sunday switch, and Sunday's
+estimate includes sales from both days. The Stock sheet export reports the
+`Inventory` baseline and cumulative `Sales`; derive remaining as `Inventory`
+minus `Sales`, clamped at zero. A blank `Inventory` field means the app cannot estimate
+remaining stock for that item.
 
 This is **per device**, not a shared live count. If Till A and Till B sell from
 the same physical stock, each till's on-screen estimate excludes the other
-till's sales. For a combined estimate, if tills share the same event-start stock,
-use the latest cumulative Sunday report from each till and calculate, per
-`ItemID`:
+till's sales. For a combined estimate, if tills share the same starting
+quantity, use the latest cumulative Sunday report from each till and calculate,
+per `ItemID`:
 
-> max(0, event-start Inventory − (Till A cumulative Sales + Till B cumulative Sales))
+> max(0, starting quantity − (Till A cumulative Sales + Till B cumulative Sales))
 
 Count each till's Sunday cumulative report once; do not add its Saturday
 snapshot as well. If tills have separate allocated stock, reconcile against
@@ -121,6 +122,6 @@ those allocations instead.
 
 Physical restocks, losses, or other stock movements are not automatically
 tracked. A physical count may therefore differ from the POS estimate. Do not
-enter a Saturday closing count as Sunday's starting Inventory: the app will
+enter a Saturday closing count as Sunday's starting quantity: the app will
 also deduct recorded Saturday sales. Ask the event organizer how to handle any
 stock changes outside recorded sales.

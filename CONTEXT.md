@@ -49,7 +49,7 @@ The hand-written order sheet given to the customer at the point of sale. Written
 _Avoid_: Order sheet, slip
 
 **Catalog**:
-The full list of items and their prices, loaded from the organizer's active Stock sheet CSV. During the event, the operator may select a different Stock sheet and edit an existing item's name, price, or starting Inventory on the device. The app does not add or remove Item IDs, and local edits never change the source CSV.
+The full list of items and their prices, loaded from the organizer's active Stock sheet CSV. During the event, the operator may select a different Stock sheet and edit an existing item's name, price, or starting quantity on the device. The app does not add or remove Item IDs, and local edits never change the source CSV.
 _Avoid_: Menu, product list
 
 **Stock sheet**:
@@ -57,7 +57,7 @@ The organizer's master CSV listing every item, with columns `ItemID, ItemName, P
 _Avoid_: Stocks file, stock list
 
 **Source cells**:
-The four cells `ItemID, ItemName, Price, Inventory` of a Stock sheet row exactly as the organizer's file delivered them, before any stripping or parsing. Written back unchanged on the Stock sheet report so the round-trip is lossless.
+The four cells `ItemID, ItemName, Price, Inventory` associated with a Stock sheet row. They start as delivered by the organizer's file; the report preserves the ItemID cell exactly, while ItemName, Price, and Inventory reflect any in-app edits. The source CSV itself is never changed.
 _Avoid_: Raw cells, original cells
 
 **Device**:

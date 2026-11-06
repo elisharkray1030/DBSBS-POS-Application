@@ -346,7 +346,7 @@ class SaleScreen(ctk.CTkFrame):
         if not messagebox.askyesno(
             "Change Stock sheet?",
             f"Use {filename} as the active Stock sheet?\n\n"
-            "This replaces active names, prices, and starting inventory. "
+            "This replaces active names, prices, and starting quantities. "
             "The End-of-day Stock sheet rows will follow this sheet. "
             "Recorded sales stay in history at their original prices, so a day's "
             "history can contain mixed prices. "
@@ -395,7 +395,7 @@ class EditCatalogItemDialog(ctk.CTkToplevel):
         self.price = ctk.CTkEntry(self, width=120)
         self.price.insert(0, str(stock.price))
         self.price.grid(row=2, column=1, sticky="w", padx=8, pady=4)
-        ctk.CTkLabel(self, text="Starting inventory:").grid(
+        ctk.CTkLabel(self, text="Starting quantity:").grid(
             row=3, column=0, sticky="e", padx=8
         )
         self.inventory = ctk.CTkEntry(self, width=120)

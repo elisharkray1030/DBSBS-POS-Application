@@ -47,8 +47,8 @@ right. The screenshot uses sample data; its figures are illustrative.
    **Remove**.
 5. Click **Settle**, choose the actual payment method, enter the requested
    amount(s), and click **Settle** in the dialog. The POS records the sale and
-   shows its sale number and any cash change due. The current sale clears after
-   a successful settlement, ready for the next customer.
+    shows its sequence number and any cash change due. The current sale clears
+    after a successful settlement, ready for the next customer.
 
 ### Payment choices
 
@@ -75,12 +75,12 @@ sheet process: the POS does not print a customer receipt.
 
 ### What the stock number means
 
-The **Stock** column is an estimate for this device: starting inventory minus
-this device's completed, non-void sales for that item. A blank inventory is
-shown as `—`. It is not a live shared count, and another till's sales, physical
-restocks, or losses are not included. The POS does not automatically mark an
-item sold out when this estimate reaches zero. When an item is physically
-unavailable, select it and click **Toggle sold-out**; while marked, the POS
+The displayed remaining quantity is an estimate for this device: starting
+quantity minus this device's completed, non-void sales for that item. A blank
+`Inventory` field is shown as `—`. It is not a live shared count, and another
+till's sales, physical restocks, or losses are not included. The POS does not
+automatically mark an item sold out when this estimate reaches zero. When an
+item is physically unavailable, select it and click **Toggle sold-out**; while marked, the POS
 blocks adding it to a sale. Click the button again only if it is available
 again.
 
@@ -100,11 +100,11 @@ successfully settled sale clears automatically.
   give a reason, then click **Record**. This changes expected cash, but is not a
   sale and does not change Takings.
 - **Edit item...** changes the selected catalog item's name, price, or starting
-  inventory for future sales. It is available only when the current sale is
+  quantity for future sales. It is available only when the current sale is
   empty; it edits an existing item, not the list of Item IDs. It does not change
   the source CSV or rewrite completed sales. Click **Save** to apply the edit.
-  Inventory here means the starting quantity; previous sales are still deducted
-  from the displayed estimate.
+  Starting quantity here means the Stock sheet's `Inventory` field; previous
+  sales are still deducted from the displayed estimate.
 - **Change stock sheet...** loads a different catalog/price CSV for future
   sales. See [Change the active stock sheet](#5-change-the-active-stock-sheet).
 - **End of day** opens the per-device review and export screen.
@@ -121,7 +121,7 @@ move money or issue a refund.
   amounts, then click **Save correction**. Added items use the active catalog's
   current name and price. Existing sale lines retain their recorded name and
   price; their quantity can be adjusted or the sale line removed. A correction
-  keeps the original sale number and replaces its contribution to totals and
+  keeps the original sequence number and replaces its contribution to totals and
   sold counts.
 - **Void** asks for confirmation and marks the sale voided. It remains visible
   for audit but is excluded from takings, expected cash, and sold counts. A
@@ -143,10 +143,10 @@ from presale prices to marked prices).
 3. Check the filename and item prices shown on Sale before taking another
    order.
 
-The new sheet supplies names, prices, and starting inventory for future sales;
+The new sheet supplies names, prices, and starting quantities for future sales;
 it does not re-price completed sales, and the source CSV is not modified. If
-the same items keep the same `ItemID` and the sheet has the correct event-start
-inventory, this till's earlier non-void sales continue to reduce the estimate.
+the same items keep the same `ItemID` and use the correct starting quantity,
+this till's earlier non-void sales continue to reduce the estimate.
 Sales for IDs missing from the active sheet remain in the history, but are not
 rows in that sheet's stock report. A sheet change makes you need a fresh export
 before wiping.
@@ -180,7 +180,7 @@ the files somewhere the organizer can access. Each export creates:
 - `items.csv` — sale lines with item name, quantity, and price. It does not
   contain Item IDs.
 - `stocks-<device name>.csv` — the active stock sheet's rows with this device's
-  calculated Sales and Revenue. Its Inventory column is the starting baseline,
+  calculated Sales and Revenue. Its `Inventory` column is the starting-quantity baseline,
   not a remaining count.
 
 Use a separate folder for each till (and, for a multi-day event, each day),

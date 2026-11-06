@@ -11,10 +11,10 @@ checks with a disposable device database and copies of valid Stock sheet CSVs.
 - [ ] Select an item, add an item to the current sale, then choose **Edit item…**.
   The app explains the current sale must be settled or emptied and does not open
   the edit dialog. Empty the current sale and verify the dialog allows editing
-  only the name, price, and starting Inventory, not the Item ID.
-- [ ] Edit and save an item's name, price, and starting Inventory. Verify future
+  only the name, price, and starting quantity, not the Item ID.
+- [ ] Edit and save an item's name, price, and starting quantity. Verify future
   sales use the edited name/price, recorded sale snapshots and the selected CSV
-  remain unchanged, and remaining Inventory uses the edited baseline minus
+  remain unchanged, and remaining quantity uses the edited baseline minus
   completed non-void sales (clamped at zero). Verify a positive remaining count
   clears that item's manual sold-out flag; when remaining is zero, an existing
   manual sold-out mark stays set.

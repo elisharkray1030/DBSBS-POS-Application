@@ -4,7 +4,7 @@ The organizer keeps a master CSV of the stall's stock — one row per item — w
 columns `ItemID, ItemName, Price, Inventory, Sales, Revenue`. That file is the
 app's catalog input. The end-of-day export emits a new file in the same
 six-column shape: it preserves each Item ID, uses the active device catalog's
-name, price, and Inventory (including local edits), and fills `Sales`/`Revenue`
+name, price, and `Inventory` value (including local edits), and fills `Sales`/`Revenue`
 from recorded history. The source master file is never modified.
 
 The instinct is two separate formats: an app-specific catalog format
@@ -14,7 +14,7 @@ drift from the authoritative sheet; and merging the two devices' results means
 reformatting before a pivot. With one round-trip format, the Item ID remains the
 item's identity from load to report, and combining Till A and Till B is a simple
 column join on `ItemID`. ADR-0007 permits device-local edits to existing item
-names, prices, and Inventory during the event; Item IDs cannot be added or
+names, prices, and starting quantities during the event; Item IDs cannot be added or
 removed, and those edits never change the organizer's source file.
 
 ## Considered options
@@ -33,8 +33,9 @@ removed, and those edits never change the organizer's source file.
   duplicate Item ID and a wrong header (including the old `Name, Price, Quantity`
   header). Pre-filled `Sales`/`Revenue` values in the loaded file are ignored.
 - The app does not add or remove Item IDs. The operator may select another
-  valid Stock sheet and edit existing item names, prices, and Inventory on the
-  device during the event; see `0007-active-stock-sheet-switching.md` for how
+  valid Stock sheet and edit existing item names, prices, and starting
+  quantities on the device during the event; see
+  `0007-active-stock-sheet-switching.md` for how
   those edits preserve sale history without changing the source CSV.
 - The end-of-day export writes a third file, `stocks-<device>.csv`, alongside
   `sales.csv` and `items.csv`: one row per catalog item in master-file order
