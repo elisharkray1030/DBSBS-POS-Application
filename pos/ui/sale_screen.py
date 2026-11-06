@@ -347,7 +347,9 @@ class SaleScreen(ctk.CTkFrame):
             "Change Stock sheet?",
             f"Use {filename} as the active Stock sheet?\n\n"
             "This replaces active names, prices, and starting inventory. "
-            "Recorded sales stay in shared history at their original prices. "
+            "The End-of-day Stock sheet rows will follow this sheet. "
+            "Recorded sales stay in history at their original prices, so a day's "
+            "history can contain mixed prices. "
             "Matching IDs subtract earlier event sales from the new inventory. "
             "Export again before wiping.",
             parent=self,

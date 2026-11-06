@@ -126,7 +126,9 @@ def test_switch_clamps_negative_remaining_to_zero_and_keeps_sold_out(
 def test_manual_catalog_edits_apply_to_future_sales_and_exported_source_values(
     configured_session, tmp_path
 ):
-    source = _write_sheet(tmp_path / "active.csv", ["MUG", "Mug", "60", "20"])
+    source = _write_sheet(
+        tmp_path / "active.csv", [" MUG ", "Mug", "60", "20"]
+    )
     configured_session.load_catalog(source)
     configured_session.add_item_to_sale("MUG", 1)
     configured_session.settle_current_sale(
@@ -150,10 +152,10 @@ def test_manual_catalog_edits_apply_to_future_sales_and_exported_source_values(
         if path.name.startswith("stocks-")
     ]
     assert _read_rows(report[0])[1] == [
-        "MUG", "Mug updated", "70", "22", "1", "60"
+        " MUG ", "Mug updated", "70", "22", "1", "60"
     ]
     # Editing the active catalog must not mutate the selected source file.
-    assert _read_rows(source)[1] == ["MUG", "Mug", "60", "20", "0", "0"]
+    assert _read_rows(source)[1] == [" MUG ", "Mug", "60", "20", "0", "0"]
 
 
 def test_catalog_edit_requires_empty_current_sale_and_invalidates_export(

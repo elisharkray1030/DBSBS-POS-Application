@@ -179,3 +179,32 @@ def test_sqlite_backing_round_trips_and_wipe(
     session.wipe()
     assert session.is_configured() is False
     assert session.list_sales() == []
+
+
+def test_catalog_edit_preserves_item_id_source_cell_after_reopen(
+    sqlite_store_factory, clock, tmp_path
+):
+    source = tmp_path / "padded-id.csv"
+    source.write_text(
+        "ItemID,ItemName,Price,Inventory,Sales,Revenue\n"
+        " MUG ,Mug,60,20,0,0\n",
+        encoding="utf-8",
+    )
+    session = PosSession(sqlite_store_factory(), clock=clock)
+    session.set_device_name("Till A")
+    session.set_float(500)
+    session.load_catalog(source)
+    session.edit_catalog_item(
+        "MUG", name="Edited mug", price="70", starting_quantity=25
+    )
+
+    reopened = PosSession(sqlite_store_factory(), clock=clock)
+    report = [
+        path
+        for path in reopened.export_csv(tmp_path)
+        if path.name.startswith("stocks-")
+    ]
+
+    assert _read_rows(report[0])[1] == [
+        " MUG ", "Edited mug", "70", "25", "0", "0"
+    ]

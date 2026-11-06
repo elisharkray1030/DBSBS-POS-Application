@@ -49,7 +49,7 @@ The hand-written order sheet given to the customer at the point of sale. Written
 _Avoid_: Order sheet, slip
 
 **Catalog**:
-The full list of items and their fixed prices, loaded from the organizer's active Stock sheet CSV. The operator may select a different Stock sheet during the event; the app never adds items or edits item data/prices in-app.
+The full list of items and their prices, loaded from the organizer's active Stock sheet CSV. During the event, the operator may select a different Stock sheet and edit an existing item's name, price, or starting Inventory on the device. The app does not add or remove Item IDs, and local edits never change the source CSV.
 _Avoid_: Menu, product list
 
 **Stock sheet**:

@@ -8,6 +8,19 @@ checks with a disposable device database and copies of valid Stock sheet CSVs.
 - [ ] Sale shows `Stock sheet: <filename>` and **Change stock sheet…** without
   crowding or truncating the device identity. End-of-day shows the same active
   filename.
+- [ ] Select an item, add an item to the current sale, then choose **Edit item…**.
+  The app explains the current sale must be settled or emptied and does not open
+  the edit dialog. Empty the current sale and verify the dialog allows editing
+  only the name, price, and starting Inventory, not the Item ID.
+- [ ] Edit and save an item's name, price, and starting Inventory. Verify future
+  sales use the edited name/price, recorded sale snapshots and the selected CSV
+  remain unchanged, and remaining Inventory uses the edited baseline minus
+  completed non-void sales (clamped at zero). Verify a positive remaining count
+  clears that item's manual sold-out flag; when remaining is zero, an existing
+  manual sold-out mark stays set.
+- [ ] Export, edit an item, and attempt to wipe. Wipe is blocked until a fresh
+  export is taken; verify the Stock sheet report uses the edited fields and
+  preserves the original Item ID.
 - [ ] Add an item to the current sale and choose **Change stock sheet…**. The
   app explains that the current sale must be settled or emptied, and does not
   open a file picker. Remove/settle the item and verify the action is available.
