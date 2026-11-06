@@ -13,6 +13,11 @@ pos.log
 # Sample/scratch data files
 InventoryCSV.csv
 
+# Event data written to the repo root by source runs (see pos/launch.py)
+/stock-sheet-*.csv
+/\[20??\] Sales and Purchase record Garden Fete*.csv
+/\[20??\] Sales and Purchase record Garden Fete*.pdf
+
 # Virtual environments
 .venv/
 venv/
