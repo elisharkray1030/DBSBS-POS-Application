@@ -114,6 +114,27 @@ class PosSession:
                 "Settle the current sale or remove all items first."
             )
 
+    def _clear_sold_out_for_starting_quantity_change(
+        self,
+        item: Item,
+        previous_starting_quantity: int | None,
+        sold_by_item: dict[str, tuple[int, Decimal]] | None,
+    ) -> dict[str, tuple[int, Decimal]] | None:
+        if (
+            not item.sold_out
+            or item.starting_quantity == previous_starting_quantity
+            or item.starting_quantity is None
+        ):
+            return sold_by_item
+        if sold_by_item is None:
+            sold_by_item = reporting.aggregate_sold_and_revenue(
+                self._persistence.get_sales()
+            )
+        units_sold = sold_by_item.get(item.item_id, (0, Decimal("0")))[0]
+        if item.starting_quantity - units_sold > 0:
+            item.sold_out = False
+        return sold_by_item
+
     def load_catalog(self, path: str | Path) -> int:
         self._require_empty_current_sale("change the Stock sheet")
         loaded = stock_sheet.load_catalog(path)
@@ -131,20 +152,9 @@ class PosSession:
             if previous is None:
                 continue
             item.sold_out = previous.sold_out
-            if (
-                item.sold_out
-                and item.starting_quantity != previous.starting_quantity
-                and item.starting_quantity is not None
-            ):
-                if sold_by_item is None:
-                    sold_by_item = reporting.aggregate_sold_and_revenue(
-                        self._persistence.get_sales()
-                    )
-                units_sold = sold_by_item.get(
-                    item.item_id, (0, Decimal("0"))
-                )[0]
-                if item.starting_quantity - units_sold > 0:
-                    item.sold_out = False
+            sold_by_item = self._clear_sold_out_for_starting_quantity_change(
+                item, previous.starting_quantity, sold_by_item
+            )
         candidate.catalog = loaded.items
         candidate.source_cells = loaded.source_cells
         candidate.stock_sheet_filename = filename
@@ -179,21 +189,13 @@ class PosSession:
 
         candidate = copy.deepcopy(self._settings)
         item = self._find_item_in(candidate, item_id)
-        starting_quantity_changed = item.starting_quantity != starting_quantity
+        previous_starting_quantity = item.starting_quantity
         item.name = name
         item.price = item_price
         item.starting_quantity = starting_quantity
-        sold = reporting.aggregate_sold_and_revenue(self._persistence.get_sales())
-        units_sold = sold.get(item_id, (0, Decimal("0")))[0]
-        remaining = (
-            None if starting_quantity is None else starting_quantity - units_sold
+        self._clear_sold_out_for_starting_quantity_change(
+            item, previous_starting_quantity, None
         )
-        if (
-            starting_quantity_changed
-            and remaining is not None
-            and remaining > 0
-        ):
-            item.sold_out = False
         stock_sheet.update_source_cells_after_edit(candidate.source_cells, item)
         candidate.last_export_at = None
         self._commit_settings(candidate)

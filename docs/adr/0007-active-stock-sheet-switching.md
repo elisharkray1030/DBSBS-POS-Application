@@ -30,7 +30,7 @@ stored in the device database, never written back to the selected source CSV,
 and are blocked while the current sale has items. Future sale lines use edited
 values; historical sale snapshots do not change. A starting-quantity edit sets
 a new baseline, with remaining quantity computed as that baseline minus all
-completed non-void units sold for the Item ID in the shared event history,
+completed non-void units sold for the Item ID in this device's event history,
 clamped at zero for display. Name- or price-only edits do not change the manual
 sold-out flag. When a starting quantity changes through an edit or sheet switch,
 the flag is cleared only if the recalculated remaining quantity is positive.
