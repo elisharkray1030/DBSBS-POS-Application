@@ -57,7 +57,7 @@ file remains untouched.
   action; End-of-day shows the same filename. Older databases without the
   filename show **Source not recorded** until a sheet is selected.
 - A changed sheet affects only future sales and the active Stock sheet rows;
-  historical sale snapshots and transaction-derived totals remain unchanged.
+  historical sale snapshots and sale-derived totals remain unchanged.
 - Changing the catalog/source invalidates a previous export. The operator must
   export again before wiping the device.
 - Selecting a different valid source is allowed, and existing catalog rows can
