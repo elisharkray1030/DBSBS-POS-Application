@@ -42,15 +42,15 @@ changing completed sales.
 4. If the CSV is invalid, the change fails and the previous sheet remains
    active. Check the filename and catalog before ringing the next sale.
 
-When an incoming sheet has the same `ItemID` as a previously sold item, the POS
-subtracts this device's completed, non-void sales for that ID from a numeric
-starting quantity in the `Inventory` column. The Sunday Stock sheet's Sales and
-Revenue for that ID combine Saturday and Sunday totals; Revenue reflects the
-prices actually charged on both days. Sales are not transferred to a different
-ID. Sales for an ID missing from the active sheet remain in history and the
-End-of-day summary, but will not have a row in the active Stock sheet report. A
-sheet change also means
-you must export again before the device can be wiped.
+When an incoming sheet has the same Item ID as a previously sold item, the POS
+subtracts this device's completed, non-void sales for that Item ID from the
+numeric starting quantity in the `Inventory` column. The Sunday Stock sheet's
+Sales and Revenue for that Item ID combine Saturday and Sunday totals; Revenue
+reflects the prices actually charged on both days. Sales are not transferred to
+a different Item ID. Sales for an Item ID missing from the active sheet remain
+in history and the End-of-day summary, but will not have a row in the active
+Stock sheet report. A sheet change also means you must export again before the
+device can be wiped.
 
 ## Sunday — marked prices and end of day
 

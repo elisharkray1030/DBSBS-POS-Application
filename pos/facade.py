@@ -107,12 +107,15 @@ class PosSession:
         candidate.float_amount = value
         self._commit_settings(candidate)
 
-    def load_catalog(self, path: str | Path) -> int:
+    def _require_empty_current_sale(self, action: str) -> None:
         if self._current_items:
             raise SetupError(
-                "Cannot change the Stock sheet while the current sale has items. "
+                f"Cannot {action} while the current sale has items. "
                 "Settle the current sale or remove all items first."
             )
+
+    def load_catalog(self, path: str | Path) -> int:
+        self._require_empty_current_sale("change the Stock sheet")
         loaded = stock_sheet.load_catalog(path)
         filename = Path(path).name
         candidate = copy.deepcopy(self._settings)
@@ -138,11 +141,7 @@ class PosSession:
         starting_quantity: int | None,
     ) -> None:
         """Edit an active catalog row without changing recorded sale snapshots."""
-        if self._current_items:
-            raise SetupError(
-                "Cannot edit catalog items while the current sale has items. "
-                "Settle the current sale or remove all items first."
-            )
+        self._require_empty_current_sale("edit catalog items")
         name = name.strip()
         if not name:
             raise SetupError("Item name cannot be empty")

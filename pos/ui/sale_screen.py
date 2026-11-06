@@ -349,7 +349,7 @@ class SaleScreen(ctk.CTkFrame):
             "The End-of-day Stock sheet rows will follow this sheet. "
             "Recorded sales stay in history at their original prices, so a day's "
             "history can contain mixed prices. "
-            "Matching IDs subtract earlier event sales from the new inventory. "
+            "Matching Item IDs reduce the starting quantity by earlier event sales. "
             "Export again before wiping.",
             parent=self,
         ):

@@ -34,7 +34,8 @@ right. The screenshot uses sample data; its figures are illustrative.
 
 ![Sale screen: item list, current sale, and main controls](docs/images/tutorial-sale.png)
 
-1. In **Items**, select the correct row. Check the item name, ID, and price.
+1. In **Items**, select the correct row. Check the item name, Item ID, and
+   price.
 2. Set **Qty** to the number of items to add to the current sale (a whole
    number; it starts at 1).
 3. Click **Add to sale**. The item and its total for that sale line appear in
@@ -147,8 +148,8 @@ The new sheet supplies names, prices, and starting quantities for future sales;
 it does not re-price completed sales, and the source CSV is not modified. If
 the same items keep the same `ItemID` and use the correct starting quantity,
 this till's earlier non-void sales continue to reduce the estimate.
-Sales for IDs missing from the active sheet remain in the history, but are not
-rows in that sheet's stock report. A sheet change makes you need a fresh export
+Sales for Item IDs missing from the active sheet remain in the history, but are
+not rows in that sheet's stock report. A sheet change makes you need a fresh export
 before wiping.
 
 For the Saturday-presale to Sunday-marked-price workflow, see `RUNDOWN.md` for
