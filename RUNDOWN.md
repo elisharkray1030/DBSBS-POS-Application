@@ -75,8 +75,9 @@ both days' activity on that device.
 Each export creates:
 
 - `sales.csv` — sale totals, tenders, status, and timestamps.
-- `items.csv` — sale-line item name, quantity, and price, associated with the
-  sale by device and sale sequence. It does **not** include `ItemID`.
+- `items.csv` — rows for each sale line, with item name, quantity, and price,
+  associated with the sale by device and sale sequence. It does **not** include
+  `ItemID`.
 - `stocks-<device>.csv` — the active Stock sheet's rows, with calculated Sales
   and Revenue for this device's retained history. Inventory is the starting
   baseline, not a remaining-stock column.
@@ -87,10 +88,10 @@ and `items.csv` are the same on every till and a later export can replace files
 with the same names in the destination folder.
 
 The Sunday export already includes Saturday for that till. Do not add the
-Saturday snapshot to the Sunday cumulative totals. To break line sales out by
-day, use the sale timestamps in `sales.csv`, then match device and sale sequence
-to `items.csv`. These files retain the line name, quantity, and price, but not
-the line's ItemID.
+Saturday snapshot to the Sunday cumulative totals. To see sales by sale line
+for each day, use the sale timestamps in `sales.csv`, then match device and sale
+sequence to `items.csv`. These files retain each sale line's item name, quantity,
+and price, but not its ItemID.
 
 ## Inventory: what the app can and cannot count
 

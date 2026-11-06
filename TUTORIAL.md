@@ -35,13 +35,15 @@ right. The screenshot uses sample data; its figures are illustrative.
 ![Sale screen: item list, current sale, and main controls](docs/images/tutorial-sale.png)
 
 1. In **Items**, select the correct row. Check the item name, ID, and price.
-2. Set **Qty** to the number being purchased (a whole number; it starts at 1).
-3. Click **Add to sale**. The item and line total appear in **Current sale**.
+2. Set **Qty** to the number of items to add to the current sale (a whole
+   number; it starts at 1).
+3. Click **Add to sale**. The item and its total for that sale line appear in
+   **Current sale**.
    Adding the same item again increases its quantity. Check the running total
    before taking payment.
 4. To change a quantity already in the current sale, double-click its **Qty**
    cell, type the new quantity, then press Enter or click elsewhere to save.
-   Press Escape to cancel that edit. To remove a line, select it and click
+   Press Escape to cancel that edit. To remove a sale line, select it and click
    **Remove**.
 5. Click **Settle**, choose the actual payment method, enter the requested
    amount(s), and click **Settle** in the dialog. The POS records the sale and
@@ -114,19 +116,20 @@ choose the appropriate action. These actions change the POS record; they do not
 move money or issue a refund.
 
 - **Correct...** edits a completed sale's items, quantities, and settlement.
-  Adjust or remove an incorrect line, or choose a catalog item and quantity and
-  click **Add line** to add a missing item. Check the new total and payment
+  Adjust or remove an incorrect sale line, or choose a catalog item and quantity
+  and click **Add line** to add a missing item. Check the new total and payment
   amounts, then click **Save correction**. Added items use the active catalog's
-  current name and price. Existing lines retain their recorded name and price;
-  their quantity can be adjusted or the line removed. A correction keeps the
-  original sale number and replaces its contribution to totals and sold counts.
+  current name and price. Existing sale lines retain their recorded name and
+  price; their quantity can be adjusted or the sale line removed. A correction
+  keeps the original sale number and replaces its contribution to totals and
+  sold counts.
 - **Void** asks for confirmation and marks the sale voided. It remains visible
   for audit but is excluded from takings, expected cash, and sold counts. A
   voided sale cannot be corrected in the POS.
 
 Take care to select the intended sale. If money has already changed hands,
 follow the event organizer's instructions for handling the real-world cash,
-voucher, or Octopus transaction as well.
+voucher, or Octopus payment as well.
 
 ## 5. Change the active stock sheet
 

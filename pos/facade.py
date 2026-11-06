@@ -124,19 +124,6 @@ class PosSession:
         candidate.catalog = loaded.items
         candidate.source_cells = loaded.source_cells
         candidate.stock_sheet_filename = filename
-        if loaded.items:
-            sold = reporting.aggregate_sold_and_revenue(
-                self._persistence.get_sales()
-            )
-            for item in candidate.catalog:
-                remaining = (
-                    None
-                    if item.starting_quantity is None
-                    else item.starting_quantity
-                    - sold.get(item.item_id, (0, Decimal("0")))[0]
-                )
-                if remaining is not None and remaining > 0:
-                    item.sold_out = False
         if catalog_changed:
             candidate.last_export_at = None
         self._commit_settings(candidate)
