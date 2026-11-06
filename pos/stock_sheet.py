@@ -152,6 +152,28 @@ def load_catalog(path: str | Path) -> LoadedCatalog:
     return LoadedCatalog(items=items, source_cells=source_cells)
 
 
+def update_source_cells_after_edit(
+    source_cells: dict[str, SourceCells], item: Item
+) -> None:
+    """Update editable report cells while preserving the source Item ID cell.
+
+    Legacy catalogs without stored source cells continue to use the report
+    builder's fallback from the edited domain item.
+    """
+    cells = source_cells.get(item.item_id)
+    if cells is None:
+        return
+    inventory_cell = (
+        "" if item.starting_quantity is None else str(item.starting_quantity)
+    )
+    source_cells[item.item_id] = (
+        cells[0],
+        item.name,
+        str(item.price),
+        inventory_cell,
+    )
+
+
 def build_report_rows(
     catalog_items: list[Item],
     sold_by_item: dict[str, tuple[int, Decimal]],

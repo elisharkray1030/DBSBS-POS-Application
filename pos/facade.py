@@ -168,18 +168,7 @@ class PosSession:
         )
         if remaining is not None and remaining > 0:
             item.sold_out = False
-        source_cells = candidate.source_cells.get(item_id)
-        if source_cells is not None:
-            # Item ID is immutable; preserve its exact source-cell spelling.
-            inventory = (
-                "" if starting_quantity is None else str(starting_quantity)
-            )
-            candidate.source_cells[item_id] = (
-                source_cells[0],
-                item.name,
-                str(item.price),
-                inventory,
-            )
+        stock_sheet.update_source_cells_after_edit(candidate.source_cells, item)
         candidate.last_export_at = None
         self._commit_settings(candidate)
 
