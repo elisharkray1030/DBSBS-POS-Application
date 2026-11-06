@@ -153,9 +153,9 @@ class PosSession:
             try:
                 starting_quantity = int(starting_quantity)
             except (TypeError, ValueError) as exc:
-                raise SetupError("Inventory must be a whole number") from exc
+                raise SetupError("Starting quantity must be a whole number") from exc
             if starting_quantity < 0:
-                raise SetupError("Inventory cannot be negative")
+                raise SetupError("Starting quantity cannot be negative")
 
         candidate = copy.deepcopy(self._settings)
         item = self._find_item_in(candidate, item_id)

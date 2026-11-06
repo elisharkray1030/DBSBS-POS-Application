@@ -81,7 +81,7 @@ Removing a sale from the record entirely, as though it never happened. Voids do 
 _Avoid_: Cancel, delete, refund
 
 **Starting quantity**:
-The count of an item the stall began the event with, taken from the Inventory column of the Stock sheet. The basis for the end-of-event stock check.
+The baseline count used to estimate how many units of an item remain. It is initially taken from the Stock sheet's `Inventory` column, but the operator may reset it during the event; the estimate subtracts completed, non-void units sold for that item.
 _Avoid_: Stock level, inventory
 
 **Sold out**:

@@ -20,6 +20,7 @@ from .dialogs import (
     run_dialog,
     show_error,
 )
+from .labels import stock_sheet_label
 from .qty_edit import parse_quantity_edit
 
 _QTY_COLUMNS = ("item", "qty", "total")
@@ -149,9 +150,7 @@ class SaleScreen(ctk.CTkFrame):
 
     def refresh(self) -> None:
         filename = self.session.stock_sheet_filename()
-        self.stock_sheet_var.set(
-            f"Stock sheet: {filename}" if filename else "Stock sheet: Source not recorded"
-        )
+        self.stock_sheet_var.set(stock_sheet_label(filename))
         self.item_tree.delete(*self.item_tree.get_children())
         for stock in self.session.list_items():
             remaining = "—" if stock.remaining is None else str(stock.remaining)
@@ -382,8 +381,8 @@ class EditCatalogItemDialog(ctk.CTkToplevel):
         ctk.CTkLabel(
             self,
             text=(
-                "Changes apply to future sales. Inventory is the starting "
-                "quantity; recorded sales are deducted."
+                "Changes apply to future sales. Starting quantity is based on "
+                "the Stock sheet's Inventory field; recorded sales are deducted."
             ),
             wraplength=360,
         ).grid(row=0, column=0, columnspan=2, padx=12, pady=(12, 8))
@@ -398,26 +397,31 @@ class EditCatalogItemDialog(ctk.CTkToplevel):
         ctk.CTkLabel(self, text="Starting quantity:").grid(
             row=3, column=0, sticky="e", padx=8
         )
-        self.inventory = ctk.CTkEntry(self, width=120)
-        self.inventory.insert(
+        self.starting_quantity_entry = ctk.CTkEntry(self, width=120)
+        self.starting_quantity_entry.insert(
             0, "" if stock.starting_quantity is None else str(stock.starting_quantity)
         )
-        self.inventory.grid(row=3, column=1, sticky="w", padx=8, pady=4)
+        self.starting_quantity_entry.grid(row=3, column=1, sticky="w", padx=8, pady=4)
         ctk.CTkButton(self, text="Save", command=self._save).grid(
             row=4, column=0, columnspan=2, padx=12, pady=12
         )
 
     def _save(self) -> None:
-        inventory_text = self.inventory.get().strip()
+        starting_quantity_text = self.starting_quantity_entry.get().strip()
         try:
-            inventory = None if not inventory_text else int(inventory_text)
-            if inventory_text and str(inventory) != inventory_text:
-                raise ValueError("Inventory must be a whole number")
+            starting_quantity = (
+                None if not starting_quantity_text else int(starting_quantity_text)
+            )
+            if (
+                starting_quantity_text
+                and str(starting_quantity) != starting_quantity_text
+            ):
+                raise ValueError("Starting quantity must be a whole number")
             self.session.edit_catalog_item(
                 self.item_id,
                 name=self.name.get(),
                 price=self.price.get(),
-                starting_quantity=inventory,
+                starting_quantity=starting_quantity,
             )
         except (PosError, ValueError) as exc:
             show_error("Cannot edit item", exc, LogSource.CHANGE_STOCK_SHEET)

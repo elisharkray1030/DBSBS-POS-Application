@@ -189,6 +189,14 @@ def test_catalog_edit_validation_and_persistence_failure_are_atomic(
         session.edit_catalog_item(
             "MUG", name="  ", price="70", starting_quantity=20
         )
+    with pytest.raises(SetupError, match="Starting quantity must be a whole number"):
+        session.edit_catalog_item(
+            "MUG", name="Mug", price="70", starting_quantity="not a number"
+        )
+    with pytest.raises(SetupError, match="Starting quantity cannot be negative"):
+        session.edit_catalog_item(
+            "MUG", name="Mug", price="70", starting_quantity=-1
+        )
     store.fail_saves = True
     with pytest.raises(PersistenceError):
         session.edit_catalog_item(

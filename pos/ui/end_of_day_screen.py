@@ -6,6 +6,7 @@ import customtkinter as ctk  # type: ignore[import-untyped]
 
 from . import style
 from .dialogs import ExportDialog, WipeDialog, fmt, run_dialog
+from .labels import stock_sheet_label
 
 
 class EndOfDayScreen(ctk.CTkFrame):
@@ -30,11 +31,7 @@ class EndOfDayScreen(ctk.CTkFrame):
         filename = self.session.stock_sheet_filename()
         ctk.CTkLabel(
             self,
-            text=(
-                f"Stock sheet: {filename}"
-                if filename
-                else "Stock sheet: Source not recorded"
-            ),
+            text=stock_sheet_label(filename),
             anchor="w",
         ).pack(fill="x", padx=16, pady=(6, 0))
 
