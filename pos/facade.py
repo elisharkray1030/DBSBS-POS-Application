@@ -207,6 +207,14 @@ class PosSession:
         stock_sheet.update_source_cells_after_edit(
             candidate.source_cells, previous_item, item
         )
+        catalog_changed = (
+            item.name != previous_item.name
+            or item.price != previous_item.price
+            or item.starting_quantity != previous_item.starting_quantity
+            or candidate.source_cells != self._settings.source_cells
+        )
+        if not catalog_changed:
+            return
         candidate.last_export_at = None
         self._commit_settings(candidate)
 

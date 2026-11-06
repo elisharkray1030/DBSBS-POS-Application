@@ -263,6 +263,21 @@ def test_catalog_edit_requires_empty_current_sale_and_invalidates_export(
         configured_session.wipe()
 
 
+def test_no_op_catalog_edit_keeps_export_valid(configured_session, tmp_path):
+    configured_session.add_item_to_sale("MUG", 1)
+    configured_session.settle_current_sale(
+        [Tender(CASH, Decimal("60"), tendered=Decimal("60"))]
+    )
+    configured_session.export_csv(tmp_path)
+
+    configured_session.edit_catalog_item(
+        "MUG", name="Mug", price="60.00", starting_quantity=20
+    )
+
+    configured_session.wipe()
+    assert configured_session.is_configured() is False
+
+
 def test_catalog_edit_validation_and_persistence_failure_are_atomic(
     clock, tmp_path
 ):
