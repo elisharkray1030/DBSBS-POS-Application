@@ -107,13 +107,116 @@ class PosSession:
         candidate.float_amount = value
         self._commit_settings(candidate)
 
+    def _require_empty_current_sale(self, action: str) -> None:
+        if self._current_items:
+            raise SetupError(
+                f"Cannot {action} while the current sale has items. "
+                "Settle the current sale or remove all items first."
+            )
+
+    def _clear_sold_out_for_starting_quantity_change(
+        self,
+        item: Item,
+        previous_starting_quantity: int | None,
+        sold_by_item: dict[str, tuple[int, Decimal]] | None,
+    ) -> dict[str, tuple[int, Decimal]] | None:
+        if (
+            not item.sold_out
+            or item.starting_quantity == previous_starting_quantity
+            or item.starting_quantity is None
+        ):
+            return sold_by_item
+        if sold_by_item is None:
+            sold_by_item = reporting.aggregate_sold_and_revenue(
+                self._persistence.get_sales()
+            )
+        units_sold = sold_by_item.get(item.item_id, (0, Decimal("0")))[0]
+        if item.starting_quantity - units_sold > 0:
+            item.sold_out = False
+        return sold_by_item
+
     def load_catalog(self, path: str | Path) -> int:
+        self._require_empty_current_sale("change the Stock sheet")
         loaded = stock_sheet.load_catalog(path)
+        filename = Path(path).name
         candidate = copy.deepcopy(self._settings)
+        previous_items = {item.item_id: item for item in candidate.catalog}
+        previous_catalog_data = [
+            (item.item_id, item.name, item.price, item.starting_quantity)
+            for item in candidate.catalog
+        ]
+        loaded_catalog_data = [
+            (item.item_id, item.name, item.price, item.starting_quantity)
+            for item in loaded.items
+        ]
+        catalog_changed = (
+            previous_catalog_data != loaded_catalog_data
+            or candidate.source_cells != loaded.source_cells
+        )
+        sold_by_item: dict[str, tuple[int, Decimal]] | None = None
+        for item in loaded.items:
+            previous = previous_items.get(item.item_id)
+            if previous is None:
+                continue
+            item.sold_out = previous.sold_out
+            sold_by_item = self._clear_sold_out_for_starting_quantity_change(
+                item, previous.starting_quantity, sold_by_item
+            )
         candidate.catalog = loaded.items
         candidate.source_cells = loaded.source_cells
+        candidate.stock_sheet_filename = filename
+        if catalog_changed:
+            candidate.last_export_at = None
         self._commit_settings(candidate)
         return len(loaded.items)
+
+    def edit_catalog_item(
+        self,
+        item_id: str,
+        *,
+        name: str,
+        price: str | Decimal | float,
+        starting_quantity: int | None,
+    ) -> None:
+        """Edit an active catalog row without changing recorded sale snapshots."""
+        self._require_empty_current_sale("edit catalog items")
+        name = name.strip()
+        if not name:
+            raise SetupError("Item name cannot be empty")
+        item_price = money(price)
+        if item_price < 0:
+            raise SetupError("Price cannot be negative")
+        if starting_quantity is not None:
+            try:
+                starting_quantity = int(starting_quantity)
+            except (TypeError, ValueError) as exc:
+                raise SetupError("Starting quantity must be a whole number") from exc
+            if starting_quantity < 0:
+                raise SetupError("Starting quantity cannot be negative")
+
+        candidate = copy.deepcopy(self._settings)
+        item = self._find_item_in(candidate, item_id)
+        previous_item = copy.deepcopy(item)
+        previous_starting_quantity = item.starting_quantity
+        item.name = name
+        item.price = item_price
+        item.starting_quantity = starting_quantity
+        self._clear_sold_out_for_starting_quantity_change(
+            item, previous_starting_quantity, None
+        )
+        stock_sheet.update_source_cells_after_edit(
+            candidate.source_cells, previous_item, item
+        )
+        catalog_changed = (
+            item.name != previous_item.name
+            or item.price != previous_item.price
+            or item.starting_quantity != previous_item.starting_quantity
+            or candidate.source_cells != self._settings.source_cells
+        )
+        if not catalog_changed:
+            return
+        candidate.last_export_at = None
+        self._commit_settings(candidate)
 
     def is_configured(self) -> bool:
         return self._settings.is_configured
@@ -124,6 +227,9 @@ class PosSession:
     def float_amount(self) -> Decimal | None:
         return self._settings.float_amount
 
+    def stock_sheet_filename(self) -> str | None:
+        return self._settings.stock_sheet_filename
+
     # -- catalog / items ----------------------------------------------------
 
     def list_items(self) -> list[ItemStock]:
@@ -132,9 +238,11 @@ class PosSession:
         for item in self._settings.catalog:
             remaining = None
             if item.starting_quantity is not None:
-                remaining = item.starting_quantity - sold.get(
-                    item.item_id, (0, Decimal("0"))
-                )[0]
+                remaining = max(
+                    0,
+                    item.starting_quantity
+                    - sold.get(item.item_id, (0, Decimal("0")))[0],
+                )
             stocks.append(
                 ItemStock(
                     item_id=item.item_id,
@@ -365,9 +473,12 @@ class PosSession:
                 else max(latest_record, adjustment.created_at)
             )
         last_export = self._settings.last_export_at
-        if latest_record is not None and (last_export is None or last_export < latest_record):
+        if self._settings.is_configured and (
+            last_export is None
+            or (latest_record is not None and last_export < latest_record)
+        ):
             raise PosError(
-                "Wipe blocked: take the end-of-day export first so no sale is lost."
+                "Wipe blocked: take the end-of-day export first so no session data is lost."
             )
         self._persistence.wipe()
         self._settings = Settings()

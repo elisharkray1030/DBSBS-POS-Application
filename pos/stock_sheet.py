@@ -2,8 +2,9 @@
 
 The organizer's master CSV is both the catalog input and the completed report
 shape. This module owns the whole round-trip rule: loading and validating the
-file, preserving each row's source cells verbatim, and building the report
-rows. It is the one home for that rule (architecture umbrella U1).
+file, preserving each row's source cells on load, and building report rows from
+those cells plus any device-local edits. It is the one home for that rule
+(architecture umbrella U1).
 
 The session facade calls `load_catalog` at setup and `build_report_rows` at
 export; the SQLite adapter persists the preserved source cells through the
@@ -149,6 +150,32 @@ def load_catalog(path: str | Path) -> LoadedCatalog:
         raise CatalogError("Stock sheet CSV contains no items")
 
     return LoadedCatalog(items=items, source_cells=source_cells)
+
+
+def update_source_cells_after_edit(
+    source_cells: dict[str, SourceCells], previous_item: Item, item: Item
+) -> None:
+    """Update editable report cells while preserving the source Item ID cell.
+
+    Source formatting for unchanged values is retained exactly; only cells
+    whose domain values changed are replaced with the edited values.
+    Legacy catalogs without stored source cells continue to use the report
+    builder's fallback from the edited domain item.
+    """
+    cells = source_cells.get(item.item_id)
+    if cells is None:
+        return
+    inventory_cell = (
+        "" if item.starting_quantity is None else str(item.starting_quantity)
+    )
+    source_cells[item.item_id] = (
+        cells[0],
+        item.name if item.name != previous_item.name else cells[1],
+        str(item.price) if item.price != previous_item.price else cells[2],
+        inventory_cell
+        if item.starting_quantity != previous_item.starting_quantity
+        else cells[3],
+    )
 
 
 def build_report_rows(

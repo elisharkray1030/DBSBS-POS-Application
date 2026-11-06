@@ -37,6 +37,7 @@ class LogSource(StrEnum):
     APP = "app"
     SETUP = "setup"
     SETUP_CATALOG = "setup catalog"
+    CHANGE_STOCK_SHEET = "change stock sheet"
     EXPORT = "export"
     SETTLEMENT = "settlement"
     CASH_ADJUSTMENT = "cash adjustment"

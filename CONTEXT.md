@@ -49,15 +49,15 @@ The hand-written order sheet given to the customer at the point of sale. Written
 _Avoid_: Order sheet, slip
 
 **Catalog**:
-The full list of items and their fixed prices, loaded into the app before the event from the organizer's Stock sheet CSV. Fully read-only during the event — the app never adds or edits items in-app.
+The full list of items and their prices, loaded from the organizer's active Stock sheet CSV. During the event, the operator may select a different Stock sheet and edit an existing item's name, price, or starting quantity on the device. The app does not add or remove Item IDs, and local edits never change the source CSV.
 _Avoid_: Menu, product list
 
 **Stock sheet**:
-The organizer's master CSV listing every item, with columns `ItemID, ItemName, Price, Inventory, Sales, Revenue`. Loaded into the app as the catalog before the event; at the end of the day each device writes out a new report file with the same columns, filling only its own Sales and Revenue (the source file is left untouched), and the organizer combines the two devices' reports by hand.
+The organizer's master CSV listing every item, with columns `ItemID, ItemName, Price, Inventory, Sales, Revenue`. The active sheet supplies the catalog and source cells; the operator may change it during the event. At the end of the day each device writes out a new report file with the same columns, filling Sales and Revenue from retained completed sales (the source file is left untouched), and the organizer combines the two devices' reports by hand.
 _Avoid_: Stocks file, stock list
 
 **Source cells**:
-The four cells `ItemID, ItemName, Price, Inventory` of a Stock sheet row exactly as the organizer's file delivered them, before any stripping or parsing. Written back unchanged on the Stock sheet report so the round-trip is lossless.
+The four cells `ItemID, ItemName, Price, Inventory` associated with a Stock sheet row. They start as delivered by the organizer's file; the report preserves the ItemID cell exactly, while ItemName, Price, and Inventory reflect any in-app edits. The source CSV itself is never changed.
 _Avoid_: Raw cells, original cells
 
 **Device**:
@@ -81,7 +81,7 @@ Removing a sale from the record entirely, as though it never happened. Voids do 
 _Avoid_: Cancel, delete, refund
 
 **Starting quantity**:
-The count of an item the stall began the event with, taken from the Inventory column of the Stock sheet. The basis for the end-of-event stock check.
+The baseline count used to estimate how many units of an item remain. It is initially taken from the Stock sheet's `Inventory` column, but the operator may reset it during the event; the estimate subtracts completed, non-void units sold for that item.
 _Avoid_: Stock level, inventory
 
 **Sold out**:

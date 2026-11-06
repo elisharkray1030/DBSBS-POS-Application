@@ -52,6 +52,7 @@ def test_pre_source_cells_database_is_migrated(sqlite_store_factory, clock, tmp_
 
     store = SqlitePersistence(legacy)
     session = PosSession(store, clock=clock)
+    assert session.stock_sheet_filename() is None
     session.set_device_name("Till A")
     session.set_float(500)
     report = [p for p in session.export_csv(tmp_path) if p.name.startswith("stocks-")]
@@ -157,6 +158,7 @@ def test_sqlite_backing_round_trips_and_wipe(
     assert reopened.is_configured() is True
     assert reopened.device_name() == "Till A"
     assert reopened.float_amount() == Decimal("500")
+    assert reopened.stock_sheet_filename() == "messy.csv"
     assert reopened.is_sold_out("BDG") is True
     sale = reopened.get_sale(1)
     assert sale.total == Decimal("120")
@@ -177,3 +179,61 @@ def test_sqlite_backing_round_trips_and_wipe(
     session.wipe()
     assert session.is_configured() is False
     assert session.list_sales() == []
+
+
+def test_catalog_edit_preserves_item_id_source_cell_after_reopen(
+    sqlite_store_factory, clock, tmp_path
+):
+    source = tmp_path / "padded-id.csv"
+    source.write_text(
+        "ItemID,ItemName,Price,Inventory,Sales,Revenue\n"
+        " MUG ,Mug,60,20,0,0\n",
+        encoding="utf-8",
+    )
+    session = PosSession(sqlite_store_factory(), clock=clock)
+    session.set_device_name("Till A")
+    session.set_float(500)
+    session.load_catalog(source)
+    session.edit_catalog_item(
+        "MUG", name="Edited mug", price="70", starting_quantity=25
+    )
+
+    reopened = PosSession(sqlite_store_factory(), clock=clock)
+    report = [
+        path
+        for path in reopened.export_csv(tmp_path)
+        if path.name.startswith("stocks-")
+    ]
+
+    assert _read_rows(report[0])[1] == [
+        " MUG ", "Edited mug", "70", "25", "0", "0"
+    ]
+
+
+def test_catalog_edit_preserves_unedited_source_cells_after_reopen(
+    sqlite_store_factory, clock, tmp_path
+):
+    source = tmp_path / "formatted-cells.csv"
+    source.write_text(
+        "ItemID,ItemName,Price,Inventory,Sales,Revenue\n"
+        " MUG , Mug ,60.00,020,0,0\n",
+        encoding="utf-8",
+    )
+    session = PosSession(sqlite_store_factory(), clock=clock)
+    session.set_device_name("Till A")
+    session.set_float(500)
+    session.load_catalog(source)
+    session.edit_catalog_item(
+        "MUG", name="Updated mug", price="60.00", starting_quantity=20
+    )
+
+    reopened = PosSession(sqlite_store_factory(), clock=clock)
+    report = [
+        path
+        for path in reopened.export_csv(tmp_path)
+        if path.name.startswith("stocks-")
+    ]
+
+    assert _read_rows(report[0])[1] == [
+        " MUG ", "Updated mug", "60.00", "020", "0", "0"
+    ]

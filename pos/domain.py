@@ -158,8 +158,9 @@ def validate_device_name(name: str) -> str:
     return name
 
 
-# The four source cells (ItemID, ItemName, Price, Inventory) of a Stock sheet
-# row exactly as the master file delivered them (CONTEXT.md: Source cells).
+# The four cells stored for a Stock sheet report (ItemID, ItemName, Price,
+# Inventory). On load they match the master file; edits update the last three
+# while preserving the original ItemID (CONTEXT.md: Source cells).
 SourceCells = tuple[str, str, str, str]
 
 
@@ -324,6 +325,7 @@ class Settings:
     catalog: list[Item] = field(default_factory=list)
     source_cells: dict[str, SourceCells] = field(default_factory=dict)
     last_export_at: datetime | None = None
+    stock_sheet_filename: str | None = None
 
     @property
     def is_configured(self) -> bool:

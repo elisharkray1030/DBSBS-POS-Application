@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox, ttk
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
 
 import customtkinter as ctk  # type: ignore[import-untyped]
 
@@ -19,6 +20,7 @@ from .dialogs import (
     run_dialog,
     show_error,
 )
+from .labels import stock_sheet_label
 from .qty_edit import parse_quantity_edit
 
 _QTY_COLUMNS = ("item", "qty", "total")
@@ -49,6 +51,25 @@ class SaleScreen(ctk.CTkFrame):
         ).pack(side="right", padx=4)
         ctk.CTkButton(
             top, text="Cash adjustment", width=150, command=self._open_adjustment
+        ).pack(side="right", padx=4)
+
+        sheet_row = ctk.CTkFrame(self, fg_color="transparent")
+        sheet_row.pack(fill="x", padx=12, pady=(4, 0))
+        self.stock_sheet_var = tk.StringVar()
+        ctk.CTkLabel(
+            sheet_row, textvariable=self.stock_sheet_var, anchor="w"
+        ).pack(side="left", fill="x", expand=True)
+        ctk.CTkButton(
+            sheet_row,
+            text="Change stock sheet…",
+            width=180,
+            command=self._change_stock_sheet,
+        ).pack(side="right")
+        ctk.CTkButton(
+            sheet_row,
+            text="Edit item…",
+            width=110,
+            command=self._edit_item,
         ).pack(side="right", padx=4)
 
         body = ctk.CTkFrame(self, fg_color="transparent")
@@ -128,6 +149,8 @@ class SaleScreen(ctk.CTkFrame):
     # -- actions ------------------------------------------------------------
 
     def refresh(self) -> None:
+        filename = self.session.stock_sheet_filename()
+        self.stock_sheet_var.set(stock_sheet_label(filename))
         self.item_tree.delete(*self.item_tree.get_children())
         for stock in self.session.list_items():
             remaining = "—" if stock.remaining is None else str(stock.remaining)
@@ -184,6 +207,17 @@ class SaleScreen(ctk.CTkFrame):
                 self.session.mark_sold_out(item_id)
         except PosError as exc:
             show_error("Cannot change sold-out", exc, LogSource.SOLD_OUT)
+        self.refresh()
+
+    def _edit_item(self) -> None:
+        item_id = self._selected_item_id()
+        if item_id is None:
+            messagebox.showinfo("No selection", "Select an item to edit.", parent=self)
+            return
+        if not self._guard_catalog_change("edit an item"):
+            return
+        dialog = EditCatalogItemDialog(self, self.session, item_id)
+        run_dialog(dialog)
         self.refresh()
 
     def _selected_sale_item_id(self):
@@ -283,3 +317,112 @@ class SaleScreen(ctk.CTkFrame):
         dialog = AdjustmentDialog(self, self.session)
         run_dialog(dialog)
         self.refresh()
+
+    def _change_stock_sheet(self) -> None:
+        if not self._guard_catalog_change("change the Stock sheet"):
+            return
+
+        chosen = filedialog.askopenfilename(
+            parent=self,
+            title="Choose a Stock sheet CSV",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+        )
+        if not chosen:
+            return
+
+        filename = Path(chosen).name
+        if not messagebox.askyesno(
+            "Change Stock sheet?",
+            f"Use {filename} as the active Stock sheet?\n\n"
+            "This replaces active names, prices, and starting quantities. "
+            "The End-of-day Stock sheet rows will follow this sheet. "
+            "Recorded sales stay in history at their original prices, so a day's "
+            "history can contain mixed prices. "
+            "Matching Item IDs reduce the starting quantity by earlier event sales. "
+            "Export again before wiping.",
+            parent=self,
+        ):
+            return
+
+        try:
+            count = self.session.load_catalog(chosen)
+        except (PosError, OSError, ValueError) as exc:
+            show_error("Cannot change Stock sheet", exc, LogSource.CHANGE_STOCK_SHEET)
+            return
+
+        self.refresh()
+        messagebox.showinfo(
+            "Stock sheet changed",
+            f"Loaded {count} items from {filename}.",
+            parent=self,
+        )
+
+    def _guard_catalog_change(self, action: str) -> bool:
+        if not self.session.current_sale_items():
+            return True
+        messagebox.showwarning(
+            "Current sale is not empty",
+            f"Settle the current sale or remove all its items before you {action}.",
+            parent=self,
+        )
+        return False
+
+
+class EditCatalogItemDialog(ctk.CTkToplevel):
+    """Edit an existing active catalog row; sale snapshots are unaffected."""
+
+    def __init__(self, master, session, item_id: str) -> None:
+        super().__init__(master)
+        self.session = session
+        stock = next(item for item in session.list_items() if item.item_id == item_id)
+        self.item_id = item_id
+        self.title(f"Edit item {item_id}")
+        ctk.CTkLabel(
+            self,
+            text=(
+                "Changes apply to future sales. Starting quantity is based on "
+                "the Stock sheet's Inventory field; recorded sales are deducted."
+            ),
+            wraplength=360,
+        ).grid(row=0, column=0, columnspan=2, padx=12, pady=(12, 8))
+        ctk.CTkLabel(self, text="Item name:").grid(row=1, column=0, sticky="e", padx=8)
+        self.name = ctk.CTkEntry(self, width=260)
+        self.name.insert(0, stock.name)
+        self.name.grid(row=1, column=1, padx=8, pady=4)
+        ctk.CTkLabel(self, text="Price:").grid(row=2, column=0, sticky="e", padx=8)
+        self.price = ctk.CTkEntry(self, width=120)
+        self.price.insert(0, str(stock.price))
+        self.price.grid(row=2, column=1, sticky="w", padx=8, pady=4)
+        ctk.CTkLabel(self, text="Starting quantity:").grid(
+            row=3, column=0, sticky="e", padx=8
+        )
+        self.starting_quantity_entry = ctk.CTkEntry(self, width=120)
+        self.starting_quantity_entry.insert(
+            0, "" if stock.starting_quantity is None else str(stock.starting_quantity)
+        )
+        self.starting_quantity_entry.grid(row=3, column=1, sticky="w", padx=8, pady=4)
+        ctk.CTkButton(self, text="Save", command=self._save).grid(
+            row=4, column=0, columnspan=2, padx=12, pady=12
+        )
+
+    def _save(self) -> None:
+        starting_quantity_text = self.starting_quantity_entry.get().strip()
+        try:
+            starting_quantity = (
+                None if not starting_quantity_text else int(starting_quantity_text)
+            )
+            if (
+                starting_quantity_text
+                and str(starting_quantity) != starting_quantity_text
+            ):
+                raise ValueError("Starting quantity must be a whole number")
+            self.session.edit_catalog_item(
+                self.item_id,
+                name=self.name.get(),
+                price=self.price.get(),
+                starting_quantity=starting_quantity,
+            )
+        except (PosError, ValueError) as exc:
+            show_error("Cannot edit item", exc, LogSource.CHANGE_STOCK_SHEET)
+            return
+        self.destroy()

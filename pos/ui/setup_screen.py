@@ -36,6 +36,8 @@ class SetupScreen(ctk.CTkFrame):
         row = ctk.CTkFrame(self)
         row.pack(fill="x", padx=24, pady=(4, 2))
         self.csv_path = tk.StringVar()
+        existing_filename = self.session.stock_sheet_filename()
+        self.csv_path.set(existing_filename or "")
         ctk.CTkEntry(
             row, textvariable=self.csv_path, width=320
         ).pack(side="left", padx=(0, 8))
@@ -67,7 +69,13 @@ class SetupScreen(ctk.CTkFrame):
             padx=24, pady=(8, 16)
         )
 
-        self._loaded = False
+        existing_items = self.session.list_items()
+        self._loaded = bool(existing_items)
+        if self._loaded:
+            source = existing_filename or "Source not recorded"
+            self.csv_status.set(
+                f"Loaded {len(existing_items)} items. Stock sheet: {source}"
+            )
 
     def _browse(self) -> None:
         chosen = filedialog.askopenfilename(
@@ -77,13 +85,16 @@ class SetupScreen(ctk.CTkFrame):
         )
         if not chosen:
             return
+        previous_path = self.csv_path.get()
         self.csv_path.set(chosen)
         try:
             count = self.session.load_catalog(chosen)
         except (PosError, OSError, ValueError) as exc:
+            # The failed load left any already-saved catalog untouched, so
+            # restore the active filename and keep setup ready to start.
+            self.csv_path.set(previous_path)
             self.csv_status.set(f"Could not load: {exc}")
             diagnostics.log_failure(LogSource.SETUP_CATALOG, str(exc))
-            self._loaded = False
             return
         self.csv_status.set(f"Loaded {count} items.")
         self._loaded = True

@@ -70,6 +70,9 @@ class SqlitePersistence:
                     row["value"], "Settings (float)"
                 )
                 found = True
+            elif row["key"] == "stock_sheet_filename":
+                settings.stock_sheet_filename = row["value"] or None
+                found = True
             elif row["key"] == "last_export_at" and row["value"]:
                 settings.last_export_at = sqlite_records.parse_dt(
                     row["value"], "Settings (last_export_at)"
@@ -104,6 +107,10 @@ class SqlitePersistence:
             self._conn.execute(
                 "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
                 ("float", float_value),
+            )
+            self._conn.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                ("stock_sheet_filename", settings.stock_sheet_filename or ""),
             )
             export_value = (
                 sqlite_records.iso(settings.last_export_at)

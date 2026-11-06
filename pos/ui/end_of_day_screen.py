@@ -6,6 +6,7 @@ import customtkinter as ctk  # type: ignore[import-untyped]
 
 from . import style
 from .dialogs import ExportDialog, WipeDialog, fmt, run_dialog
+from .labels import stock_sheet_label
 
 
 class EndOfDayScreen(ctk.CTkFrame):
@@ -26,6 +27,13 @@ class EndOfDayScreen(ctk.CTkFrame):
         ctk.CTkButton(
             top, text="Back to sales", width=120, command=self.app.show_sale
         ).pack(side="right")
+
+        filename = self.session.stock_sheet_filename()
+        ctk.CTkLabel(
+            self,
+            text=stock_sheet_label(filename),
+            anchor="w",
+        ).pack(fill="x", padx=16, pady=(6, 0))
 
         figures = self.session.end_of_day()
 
