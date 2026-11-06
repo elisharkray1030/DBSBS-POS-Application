@@ -116,9 +116,10 @@ Use **Sales** to open the list, select the sale by its sequence number, and
 choose the appropriate action. These actions change the POS record; they do not
 take payment or issue a refund.
 
-- **Correct...** edits a completed sale's items, quantities, and settlement.
-  Adjust or remove an incorrect sale line, or choose a catalog item and quantity
-  and click **Add line** to add a missing item. Check the new total and payment
+- **Correct...** records a Correction to a completed sale's items, quantities,
+  and settlement. Adjust or remove an incorrect sale line, or choose a catalog
+  item and quantity and click **Add line** to add a missing item. Check the new
+  total and payment
   amounts, then click **Save correction**. Added items use the active catalog's
   current name and price. Existing sale lines retain their recorded name and
   price; their quantity can be adjusted or the sale line removed. A correction
@@ -148,6 +149,9 @@ The new sheet supplies names, prices, and starting quantities for future sales;
 it does not re-price completed sales, and the source CSV is not modified. If
 the same items keep the same `ItemID` and use the correct starting quantity,
 this till's earlier non-void sales continue to reduce the estimate.
+For matching Item IDs, an existing manual Sold out mark remains when the
+starting quantity is unchanged. It clears if the quantity changes and the
+recalculated remaining quantity is positive; a new Item ID starts unmarked.
 Sales for Item IDs missing from the active sheet remain in the history, but are
 not rows in that sheet's stock report. A sheet change makes you need a fresh export
 before wiping.

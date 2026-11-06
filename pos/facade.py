@@ -119,11 +119,32 @@ class PosSession:
         loaded = stock_sheet.load_catalog(path)
         filename = Path(path).name
         candidate = copy.deepcopy(self._settings)
+        previous_items = {item.item_id: item for item in candidate.catalog}
         catalog_changed = (
             candidate.catalog != loaded.items
             or candidate.source_cells != loaded.source_cells
             or candidate.stock_sheet_filename != filename
         )
+        sold_by_item: dict[str, tuple[int, Decimal]] | None = None
+        for item in loaded.items:
+            previous = previous_items.get(item.item_id)
+            if previous is None:
+                continue
+            item.sold_out = previous.sold_out
+            if (
+                item.sold_out
+                and item.starting_quantity != previous.starting_quantity
+                and item.starting_quantity is not None
+            ):
+                if sold_by_item is None:
+                    sold_by_item = reporting.aggregate_sold_and_revenue(
+                        self._persistence.get_sales()
+                    )
+                units_sold = sold_by_item.get(
+                    item.item_id, (0, Decimal("0"))
+                )[0]
+                if item.starting_quantity - units_sold > 0:
+                    item.sold_out = False
         candidate.catalog = loaded.items
         candidate.source_cells = loaded.source_cells
         candidate.stock_sheet_filename = filename

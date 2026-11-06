@@ -28,12 +28,15 @@ The operator may edit the active catalog's item name, price, and starting
 quantity from the Sale screen, but may not add or remove Item IDs. Edits are
 stored in the device database, never written back to the selected source CSV,
 and are blocked while the current sale has items. Future sale lines use edited
-values; historical sale snapshots do not change. Starting-quantity edits set a
-new baseline, with remaining quantity computed as that baseline minus all
+values; historical sale snapshots do not change. A starting-quantity edit sets
+a new baseline, with remaining quantity computed as that baseline minus all
 completed non-void units sold for the Item ID in the shared event history,
-clamped at zero for display. If the recalculated remaining quantity is
-positive, a starting-quantity edit clears that item's manual sold-out flag.
-Catalog edits invalidate the previous export just like a sheet switch. The explicit
+clamped at zero for display. Name- or price-only edits do not change the manual
+sold-out flag. When a starting quantity changes through an edit or sheet switch,
+the flag is cleared only if the recalculated remaining quantity is positive.
+When a sheet switch retains the same Item ID and starting quantity, its manual
+sold-out flag is retained. Catalog edits invalidate the previous export just
+like a sheet switch. The explicit
 end-of-day export uses the edited active catalog values for its Stock sheet
 rows and actual recorded history for Sales and Revenue; the selected source
 file remains untouched.

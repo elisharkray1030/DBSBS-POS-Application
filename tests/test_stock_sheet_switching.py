@@ -115,12 +115,26 @@ def test_switch_clamps_negative_remaining_to_zero_and_keeps_sold_out(
     configured_session.settle_current_sale(
         [Tender(CASH, Decimal("180"), tendered=Decimal("180"))]
     )
+    configured_session.mark_sold_out("MUG")
 
     configured_session.load_catalog(second)
 
     stock = configured_session.list_items()[0]
     assert stock.remaining == 0
-    assert stock.sold_out is False
+    assert stock.sold_out is True
+
+
+def test_switch_preserves_sold_out_when_starting_quantity_is_unchanged(
+    configured_session, tmp_path
+):
+    first = _write_sheet(tmp_path / "first.csv", ["MUG", "Mug", "60", "20"])
+    second = _write_sheet(tmp_path / "second.csv", ["MUG", "Mug", "75", "20"])
+    configured_session.load_catalog(first)
+    configured_session.mark_sold_out("MUG")
+
+    configured_session.load_catalog(second)
+
+    assert configured_session.is_sold_out("MUG") is True
 
 
 def test_manual_catalog_edits_apply_to_future_sales_and_exported_source_values(

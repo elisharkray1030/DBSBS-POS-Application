@@ -49,8 +49,11 @@ Sales and Revenue for that Item ID combine Saturday and Sunday totals; Revenue
 reflects the prices actually charged on both days. Sales are not transferred to
 a different Item ID. Sales for an Item ID missing from the active sheet remain
 in history and the End-of-day summary, but will not have a row in the active
-Stock sheet report. A sheet change also means you must export again before the
-device can be wiped.
+Stock sheet report. For matching Item IDs, an existing manual Sold out mark
+remains when the starting quantity is unchanged. It clears if the quantity
+changes and the recalculated remaining quantity is positive; new Item IDs start
+unmarked. A sheet change also means you must export again before the device can
+be wiped.
 
 ## Sunday — marked prices and end of day
 

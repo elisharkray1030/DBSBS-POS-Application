@@ -18,6 +18,10 @@ checks with a disposable device database and copies of valid Stock sheet CSVs.
   completed non-void sales (clamped at zero). Verify a name/price-only edit
   keeps an existing sold-out mark. A changed starting quantity with positive
   remaining clears that mark; when remaining is zero, it stays set.
+- [ ] Mark an item sold out, then switch to a sheet with the same Item ID and
+  starting quantity; verify the mark remains. Switch to a sheet with a changed
+  starting quantity and positive remaining; verify the mark clears. If remaining
+  is zero, verify the mark stays set.
 - [ ] Export, edit an item, and attempt to wipe. Wipe is blocked until a fresh
   export is taken; verify the Stock sheet report uses the edited fields and
   preserves the original Item ID.
