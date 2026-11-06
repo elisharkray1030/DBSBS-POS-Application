@@ -15,9 +15,9 @@ checks with a disposable device database and copies of valid Stock sheet CSVs.
 - [ ] Edit and save an item's name, price, and starting quantity. Verify future
   sales use the edited name/price, recorded sale snapshots and the selected CSV
   remain unchanged, and remaining quantity uses the edited baseline minus
-  completed non-void sales (clamped at zero). Verify a positive remaining count
-  clears that item's manual sold-out flag; when remaining is zero, an existing
-  manual sold-out mark stays set.
+  completed non-void sales (clamped at zero). Verify a name/price-only edit
+  keeps an existing sold-out mark. A changed starting quantity with positive
+  remaining clears that mark; when remaining is zero, it stays set.
 - [ ] Export, edit an item, and attempt to wipe. Wipe is blocked until a fresh
   export is taken; verify the Stock sheet report uses the edited fields and
   preserves the original Item ID.

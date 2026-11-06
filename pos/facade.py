@@ -158,6 +158,7 @@ class PosSession:
 
         candidate = copy.deepcopy(self._settings)
         item = self._find_item_in(candidate, item_id)
+        starting_quantity_changed = item.starting_quantity != starting_quantity
         item.name = name
         item.price = item_price
         item.starting_quantity = starting_quantity
@@ -166,7 +167,11 @@ class PosSession:
         remaining = (
             None if starting_quantity is None else starting_quantity - units_sold
         )
-        if remaining is not None and remaining > 0:
+        if (
+            starting_quantity_changed
+            and remaining is not None
+            and remaining > 0
+        ):
             item.sold_out = False
         stock_sheet.update_source_cells_after_edit(candidate.source_cells, item)
         candidate.last_export_at = None

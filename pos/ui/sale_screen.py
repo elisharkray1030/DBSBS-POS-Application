@@ -214,12 +214,7 @@ class SaleScreen(ctk.CTkFrame):
         if item_id is None:
             messagebox.showinfo("No selection", "Select an item to edit.", parent=self)
             return
-        if self.session.current_sale_items():
-            messagebox.showwarning(
-                "Current sale is not empty",
-                "Settle the current sale or remove all its items before editing an item.",
-                parent=self,
-            )
+        if not self._guard_catalog_change("edit an item"):
             return
         dialog = EditCatalogItemDialog(self, self.session, item_id)
         run_dialog(dialog)
@@ -324,13 +319,7 @@ class SaleScreen(ctk.CTkFrame):
         self.refresh()
 
     def _change_stock_sheet(self) -> None:
-        if self.session.current_sale_items():
-            messagebox.showwarning(
-                "Current sale is not empty",
-                "Settle the current sale or remove all its items before changing "
-                "the Stock sheet.",
-                parent=self,
-            )
+        if not self._guard_catalog_change("change the Stock sheet"):
             return
 
         chosen = filedialog.askopenfilename(
@@ -367,6 +356,16 @@ class SaleScreen(ctk.CTkFrame):
             f"Loaded {count} items from {filename}.",
             parent=self,
         )
+
+    def _guard_catalog_change(self, action: str) -> bool:
+        if not self.session.current_sale_items():
+            return True
+        messagebox.showwarning(
+            "Current sale is not empty",
+            f"Settle the current sale or remove all its items before you {action}.",
+            parent=self,
+        )
+        return False
 
 
 class EditCatalogItemDialog(ctk.CTkToplevel):

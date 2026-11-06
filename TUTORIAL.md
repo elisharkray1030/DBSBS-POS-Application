@@ -55,7 +55,7 @@ right. The screenshot uses sample data; its figures are illustrative.
 
 The settlement dialog offers **Cash**, **Voucher**, **Octopus**, and
 **Cash + Voucher**. The payment method is a record for reconciliation; the
-cashier still handles the money and uses the separate Octopus machine.
+cashier still handles payment and uses the separate Octopus machine.
 
 - **Cash:** enter the notes/coins handed over as **Cash tendered**. The amount
   applied to the sale is the sale total; the dialog reports change due.
@@ -80,9 +80,9 @@ The displayed remaining quantity is an estimate for this device: starting
 quantity minus this device's completed, non-void sales for that item. A blank
 `Inventory` field is shown as `—`. It is not a live shared count, and another
 till's sales, physical restocks, or losses are not included. The POS does not
-automatically mark an item sold out when this estimate reaches zero. When an
-item is physically unavailable, select it and click **Toggle sold-out**; while marked, the POS
-blocks adding it to a sale. Click the button again only if it is available
+automatically mark an item sold out when this estimate reaches zero. When the
+cashier decides to mark an item **Sold out**, select it and click
+**Toggle sold-out**; while marked, the POS blocks adding it to a sale. Click the button again only if it is available
 again.
 
 **New sale** clears the current, unsettled sale. Use it only when you intend to
@@ -95,7 +95,7 @@ successfully settled sale clears automatically.
   Takings includes all payment methods, not just cash; voided sales are
   excluded.
 - **Sales** opens the recorded-sales list. Select a sale to use **Correct...**
-  or **Void** (see [Fix a recorded sale](#4-fix-a-recorded-sale)).
+  or **Void** (see [Correct a recorded sale](#4-correct-a-recorded-sale)).
 - **Cash adjustment** records cash added to or removed from the drawer. Enter a
   positive amount for cash added or a negative amount for cash removed, and
   give a reason, then click **Record**. This changes expected cash, but is not a
@@ -110,11 +110,11 @@ successfully settled sale clears automatically.
   sales. See [Change the active stock sheet](#5-change-the-active-stock-sheet).
 - **End of day** opens the per-device review and export screen.
 
-## 4. Fix a recorded sale
+## 4. Correct a recorded sale
 
 Use **Sales** to open the list, select the sale by its sequence number, and
 choose the appropriate action. These actions change the POS record; they do not
-move money or issue a refund.
+take payment or issue a refund.
 
 - **Correct...** edits a completed sale's items, quantities, and settlement.
   Adjust or remove an incorrect sale line, or choose a catalog item and quantity
@@ -128,7 +128,7 @@ move money or issue a refund.
   for audit but is excluded from takings, expected cash, and sold counts. A
   voided sale cannot be corrected in the POS.
 
-Take care to select the intended sale. If money has already changed hands,
+Take care to select the intended sale. If payment has already been made,
 follow the event organizer's instructions for handling the real-world cash,
 voucher, or Octopus payment as well.
 

@@ -158,6 +158,16 @@ def test_manual_catalog_edits_apply_to_future_sales_and_exported_source_values(
     assert _read_rows(source)[1] == [" MUG ", "Mug", "60", "20", "0", "0"]
 
 
+def test_name_and_price_edits_do_not_clear_sold_out(configured_session):
+    configured_session.mark_sold_out("MUG")
+
+    configured_session.edit_catalog_item(
+        "MUG", name="Updated mug", price="70", starting_quantity=20
+    )
+
+    assert configured_session.is_sold_out("MUG") is True
+
+
 def test_catalog_edit_requires_empty_current_sale_and_invalidates_export(
     configured_session, tmp_path
 ):
