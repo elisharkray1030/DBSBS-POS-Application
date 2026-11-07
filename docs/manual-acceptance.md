@@ -23,11 +23,12 @@ checks with a disposable device database and copies of valid Stock sheet CSVs.
   to blank Item ID and Qty `1`, and focus returns to Item ID. Enter a second ID
   and add it with Enter; verify the second add succeeds and the fields reset for
   the next entry.
-- [ ] Clear Qty and verify it defaults to `1`. Try non-integer, zero, and
-  negative Qty; verify each error is inline, the entered values remain, and
-  focus stays on Qty. Correct and retry. Try an unknown ID and a sold-out ID;
-  verify inline feedback, retained values, and focus on Item ID. Correct the ID
-  and verify the retained Qty can be used to retry.
+- [ ] With a valid ID, clear Qty and add with Enter; verify one item is added
+  and Qty visibly resets to `1`. Try non-integer, zero, and negative Qty; verify
+  each error is inline, the entered values remain, and focus stays on Qty.
+  Correct and retry. Try an unknown ID and a sold-out ID; verify inline
+  feedback, retained values, and focus on Item ID. Correct the ID and verify
+  the retained Qty can be used to retry.
 - [ ] Press Escape from either quick-entry field. Verify Item ID clears, Qty
   returns to `1`, quick entry exits, and focus returns to the item list.
 - [ ] With an item selected, use mouse **Add to sale** with a non-default Qty.
