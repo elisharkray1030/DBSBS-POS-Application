@@ -36,20 +36,47 @@ right. The screenshot uses sample data; its figures are illustrative.
 
 1. In **Items**, select the correct row. Check the item name, Item ID, and
    price.
-2. Set **Qty** to the number of items to add to the current sale (a whole
-   number; it starts at 1).
-3. Click **Add to sale**. The item and its total for that sale line appear in
-   **Current sale**.
+2. Set **Qty** in the strip beside **Items** to the number of items to add to
+   the current sale (a whole number; it starts at 1). This Qty is shared by
+   keyboard quick entry and the mouse controls.
+3. To use the mouse, select the item row and click **Add to sale**. The item and
+   its total for that sale line appear in **Current sale**. A blank Qty means
+   `1`. After a successful add Qty resets to `1`; if the add fails, the value
+   stays available to correct and retry.
    Adding the same item again increases its quantity. Check the running total
    before taking payment.
 4. To change a quantity already in the current sale, double-click its **Qty**
    cell, type the new quantity, then press Enter or click elsewhere to save.
    Press Escape to cancel that edit. To remove a sale line, select it and click
-   **Remove**.
-5. Click **Settle**, choose the actual payment method, enter the requested
+   **Remove**. Click **Remove All** to clear every item from the current sale;
+   this does not record or settle the sale.
+5. Click **Settle** (or press **F12** when focus is outside an editable text
+   field), choose the actual payment method, enter the requested
    amount(s), and click **Settle** in the dialog. The POS records the sale and
     shows its sequence number and any cash change due. The current sale clears
     after a successful settlement, ready for the next customer.
+
+### Keyboard quick entry
+
+To add items without selecting them in the table, press `/` or keypad `/` when
+focus is outside an editable text field on the Sale screen. Type the Item ID in
+the quick-entry strip beside **Items**, then press Enter. The shared Qty field
+receives focus with `1` selected; type a different positive whole number, keep
+`1`, or leave Qty blank (blank defaults to `1`), then press Enter to add the
+item. On success, the Item ID clears, Qty returns to `1`, and focus returns to
+Item ID so you can enter the next item. Press Escape from either quick-entry
+field to clear the fields, leave quick entry, and return focus to the item list.
+
+Errors appear beside the quick-entry fields instead of in a dialog. An invalid
+Qty keeps focus on Qty; an empty, unknown, or sold-out Item ID keeps focus on
+Item ID. The entered values remain available to correct and retry. Slash is
+ordinary text while an editable field has focus and does not activate quick
+entry in dialogs or on other screens. The mouse **Add to sale** control below
+the item list also returns its Qty to `1` after a successful add; a failed add
+keeps the entered Qty.
+
+Press **F12** to open the existing settlement flow from the Sale screen. It is
+ignored while an editable text field or a dialog has focus and on other screens.
 
 ### Payment choices
 
@@ -65,9 +92,10 @@ cashier still handles payment and uses the separate Octopus machine.
   select **Octopus** here and settle; the sale total is recorded automatically.
   Octopus must cover the entire sale by itself; it cannot be combined with cash
   or vouchers. The POS is not connected to the machine.
-- **Cash + Voucher:** enter the cash portion, the cash tendered, and the voucher
-  portion. Both portions must be positive and together equal the sale total;
-  the cash tendered must be at least the cash portion. For a single payment
+- **Cash + Voucher:** enter the notes/coins handed over as **Cash tendered** and
+  enter the **Voucher portion**. The POS calculates the cash portion as the sale
+  total minus the voucher portion. Both portions must be positive, and cash
+  tendered must be at least the calculated cash portion. For a single payment
   method, choose **Cash** or **Voucher** instead.
 
 If the amounts do not match the sale total, the POS rejects settlement; correct
@@ -85,8 +113,8 @@ cashier decides to mark an item **Sold out**, select it and click
 **Toggle sold-out**; while marked, the POS blocks adding it to a sale. Click the button again only if it is available
 again.
 
-**New sale** clears the current, unsettled sale. Use it only when you intend to
-discard that in-progress order; it does not record or settle anything. A
+**Remove All** clears the current, unsettled sale. Use it only when you intend
+to discard that in-progress order; it does not record or settle anything. A
 successfully settled sale clears automatically.
 
 ## 3. Other Sale-screen controls

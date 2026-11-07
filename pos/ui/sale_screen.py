@@ -8,6 +8,7 @@ from tkinter import filedialog, messagebox, ttk
 
 import customtkinter as ctk  # type: ignore[import-untyped]
 
+from pos import diagnostics
 from pos.diagnostics import LogSource
 from pos.domain import PosError
 
@@ -22,6 +23,7 @@ from .dialogs import (
 )
 from .labels import stock_sheet_label
 from .qty_edit import parse_quantity_edit
+from .quick_entry import QuickEntryError, parse_item_id, parse_quantity
 
 _QTY_COLUMNS = ("item", "qty", "total")
 _QTY_COLUMN_NAME = "qty"
@@ -81,7 +83,35 @@ class SaleScreen(ctk.CTkFrame):
         # Left: item list
         left = ctk.CTkFrame(body, fg_color="transparent")
         left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
-        ctk.CTkLabel(left, text="Items", anchor="w").pack(fill="x")
+        items_header = ctk.CTkFrame(left, fg_color="transparent")
+        items_header.pack(fill="x")
+        ctk.CTkLabel(items_header, text="Items", anchor="w").pack(side="left")
+        ctk.CTkLabel(items_header, text="Item ID:").pack(side="left", padx=(8, 2))
+        self.quick_item_var = tk.StringVar(value="")
+        self.quick_item_entry = ctk.CTkEntry(
+            items_header, textvariable=self.quick_item_var, width=88, height=28
+        )
+        self.quick_item_entry.pack(side="left")
+        ctk.CTkLabel(items_header, text="Qty:").pack(side="left", padx=(6, 2))
+        self.quick_qty_var = tk.StringVar(value="1")
+        self.quick_qty_entry = ctk.CTkEntry(
+            items_header, textvariable=self.quick_qty_var, width=48, height=28
+        )
+        self.quick_qty_entry.pack(side="left")
+        self.quick_error_var = tk.StringVar(value="")
+        ctk.CTkLabel(
+            items_header,
+            textvariable=self.quick_error_var,
+            text_color="#b04545",
+            anchor="w",
+            justify="left",
+            wraplength=150,
+        ).pack(side="left", fill="x", expand=True, padx=(6, 0))
+        self.quick_item_entry.bind("<Return>", self._quick_item_id_enter)
+        self.quick_qty_entry.bind("<Return>", self._quick_quantity_enter)
+        self.quick_item_entry.bind("<Escape>", self._exit_quick_add)
+        self.quick_qty_entry.bind("<Escape>", self._exit_quick_add)
+
         self.item_tree = style.make_table(
             left,
             ("item_id", "name", "price", "remaining"),
@@ -96,9 +126,6 @@ class SaleScreen(ctk.CTkFrame):
 
         controls = ctk.CTkFrame(left, fg_color="transparent")
         controls.pack(fill="x", pady=(0, 4))
-        ctk.CTkLabel(controls, text="Qty:").pack(side="left")
-        self.qty_var = tk.StringVar(value="1")
-        ctk.CTkEntry(controls, textvariable=self.qty_var, width=50).pack(side="left")
         ctk.CTkButton(
             controls, text="Add to sale", width=110, command=self._add_to_sale
         ).pack(side="left", padx=4)
@@ -118,14 +145,25 @@ class SaleScreen(ctk.CTkFrame):
         self.sale_tree.bind("<Motion>", self._on_sale_tree_motion)
         self._qty_editor: ttk.Entry | None = None
 
+        self._slash_binding = self.app.bind(
+            "<slash>", self._on_quick_add_shortcut, add="+"
+        )
+        self._keypad_slash_binding = self.app.bind(
+            "<KP_Divide>", self._on_quick_add_shortcut, add="+"
+        )
+        self._f12_binding = self.app.bind(
+            "<F12>", self._on_settle_shortcut, add="+"
+        )
+        self.bind("<Destroy>", self._on_destroy, add="+")
+
         sale_controls = ctk.CTkFrame(right, fg_color="transparent")
         sale_controls.pack(fill="x", pady=(0, 4))
         ctk.CTkButton(
             sale_controls, text="Remove", width=80, command=self._remove_from_sale
         ).pack(side="left", padx=4)
         ctk.CTkButton(
-            sale_controls, text="New sale", width=90, command=self._new_sale
-        ).pack(side="right")
+            sale_controls, text="Remove All", width=100, command=self._remove_all
+        ).pack(side="left", padx=4)
 
         self.total_var = tk.StringVar()
         ctk.CTkLabel(
@@ -190,11 +228,110 @@ class SaleScreen(ctk.CTkFrame):
         item_id = self._selected_item_id()
         if item_id is None:
             return
+        quantity = parse_quantity(self.quick_qty_var.get())
+        if isinstance(quantity, QuickEntryError):
+            show_error(
+                "Cannot add item", ValueError(quantity.message), LogSource.ADD_TO_SALE
+            )
+            self.refresh()
+            return
+        error = self._add_item_to_current_sale(item_id, quantity)
+        if error is not None:
+            show_error("Cannot add item", error, LogSource.ADD_TO_SALE)
+            return
+        self.quick_qty_var.set("1")
+
+    def _add_item_to_current_sale(self, item_id: str, quantity: int) -> Exception | None:
+        error = None
         try:
-            self.session.add_item_to_sale(item_id, int(self.qty_var.get()))
+            self.session.add_item_to_sale(item_id, quantity)
         except (PosError, ValueError) as exc:
-            show_error("Cannot add item", exc, LogSource.ADD_TO_SALE)
+            error = exc
         self.refresh()
+        return error
+
+    def _on_quick_add_shortcut(self, _event):
+        if self.app._current is not self:
+            return None
+        focused = self.focus_get()
+        if focused is not None and self._is_editable_text_widget(focused):
+            return None
+        self.quick_error_var.set("")
+        self.quick_item_entry.focus_set()
+        return "break"
+
+    def _on_settle_shortcut(self, _event):
+        if self.app._current is not self:
+            return None
+        if self.app.grab_current() is not None:
+            return None
+        focused = self.focus_get()
+        if focused is not None and (
+            focused.winfo_toplevel() is not self.winfo_toplevel()
+            or self._is_editable_text_widget(focused)
+        ):
+            return None
+        self._settle()
+        return "break"
+
+    @staticmethod
+    def _is_editable_text_widget(widget) -> bool:
+        return isinstance(widget, (tk.Entry, tk.Text, ttk.Entry, ttk.Combobox))
+
+    def _quick_item_id_enter(self, _event):
+        if self._validated_quick_item_id() is None:
+            return "break"
+        self.quick_error_var.set("")
+        self.quick_qty_entry.focus_set()
+        self.quick_qty_entry.select_range(0, "end")
+        return "break"
+
+    def _validated_quick_item_id(self) -> str | None:
+        item_id = parse_item_id(self.quick_item_var.get())
+        if isinstance(item_id, QuickEntryError):
+            self.quick_error_var.set(item_id.message)
+            self.quick_item_entry.focus_set()
+            return None
+        return item_id
+
+    def _quick_quantity_enter(self, _event):
+        item_id = self._validated_quick_item_id()
+        if item_id is None:
+            return "break"
+
+        quantity = parse_quantity(self.quick_qty_var.get())
+        if isinstance(quantity, QuickEntryError):
+            self.quick_error_var.set(quantity.message)
+            self.quick_qty_entry.focus_set()
+            return "break"
+
+        error = self._add_item_to_current_sale(item_id, quantity)
+        if error is not None:
+            diagnostics.log_failure(LogSource.ADD_TO_SALE, str(error))
+            self.quick_error_var.set(str(error))
+            self.quick_item_entry.focus_set()
+            return "break"
+
+        self._reset_quick_entry()
+        self.quick_item_entry.focus_set()
+        return "break"
+
+    def _reset_quick_entry(self) -> None:
+        self.quick_item_var.set("")
+        self.quick_qty_var.set("1")
+        self.quick_error_var.set("")
+
+    def _exit_quick_add(self, _event):
+        self._reset_quick_entry()
+        self.item_tree.focus_set()
+        return "break"
+
+    def _on_destroy(self, event) -> None:
+        if event.widget is not self:
+            return
+        self.app.unbind("<slash>", self._slash_binding)
+        self.app.unbind("<KP_Divide>", self._keypad_slash_binding)
+        self.app.unbind("<F12>", self._f12_binding)
 
     def _toggle_sold_out(self) -> None:
         item_id = self._selected_item_id()
@@ -296,7 +433,7 @@ class SaleScreen(ctk.CTkFrame):
         self.session.set_sale_quantity(item_id, 0)
         self.refresh()
 
-    def _new_sale(self) -> None:
+    def _remove_all(self) -> None:
         self.session.begin_sale()
         self.refresh()
 

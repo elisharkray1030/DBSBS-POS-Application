@@ -141,9 +141,9 @@ merges the two devices' reports by hand. See
 
 - **Setup** — load/select the Stock sheet CSV, enter the float, name the device.
 - **Sale** — scrollable item list with Item IDs, live remaining counts and
-  sold-out dimming, running total, settle by cash / voucher / Octopus /
-  cash+voucher, cash adjustments, corrections and voids; view/change the active
-  Stock sheet.
+  sold-out dimming; keyboard quick entry with `/` or keypad `/`; running total,
+  settle by cash / voucher / Octopus / cash+voucher, cash adjustments,
+  corrections and voids; view/change the active Stock sheet.
 - **End of day** — expected cash (float + cash sales + adjustments), Octopus
   total, voucher total, per-item sold counts, voids list; export three files
   (`sales.csv`, `items.csv`, and the device's Stock sheet report) and wipe the
