@@ -11,14 +11,18 @@ checks with a disposable device database and copies of valid Stock sheet CSVs.
 - [ ] Sale shows `Stock sheet: <filename>` and **Change stock sheet…** without
   crowding or truncating the device identity. End-of-day shows the same active
   filename.
-- [ ] On Sale, focus the item list and press `/`, then keypad `/`; each shortcut
-  focuses the quick-entry Item ID field. Verify slash remains ordinary text in
-  editable fields, including the quick-entry fields and the inline sale Qty
-  editor, and does not activate quick entry in a dialog or on another screen.
+- [ ] On Sale, focus the item list and press `/`; verify focus moves to the
+  quick-entry Item ID field. Press Escape to return focus to the item list, then
+  press keypad `/` and verify it also focuses Item ID. Verify slash remains
+  ordinary text in editable fields, including quick-entry fields and the inline
+  sale Qty editor, and does not activate quick entry in a dialog or on another
+  screen.
 - [ ] Press Enter with Item ID empty. Verify inline feedback appears and focus
   stays on Item ID. Enter a valid ID and press Enter; verify Qty is `1` and
   selected. Change Qty and add with Enter; verify the sale updates, fields reset
-  to blank Item ID and Qty `1`, and focus returns to Item ID for repeated adds.
+  to blank Item ID and Qty `1`, and focus returns to Item ID. Enter a second ID
+  and add it with Enter; verify the second add succeeds and the fields reset for
+  the next entry.
 - [ ] Clear Qty and verify it defaults to `1`. Try non-integer, zero, and
   negative Qty; verify each error is inline, the entered values remain, and
   focus stays on Qty. Correct and retry. Try an unknown ID and a sold-out ID;
