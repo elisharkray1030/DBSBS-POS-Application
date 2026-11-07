@@ -36,7 +36,10 @@ def parse_quantity(raw: str) -> int | QuickEntryError:
         return 1
     if not quantity_text.isdecimal():
         return _INVALID_QUANTITY
-    quantity = int(quantity_text)
+    try:
+        quantity = int(quantity_text)
+    except ValueError:
+        return _INVALID_QUANTITY
     if quantity < 1:
         return _INVALID_QUANTITY
     return quantity

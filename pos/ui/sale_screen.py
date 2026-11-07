@@ -229,12 +229,25 @@ class SaleScreen(ctk.CTkFrame):
         if item_id is None:
             return
         try:
-            self.session.add_item_to_sale(item_id, int(self.qty_var.get()))
-        except (PosError, ValueError) as exc:
+            quantity = int(self.qty_var.get())
+        except ValueError as exc:
             show_error("Cannot add item", exc, LogSource.ADD_TO_SALE)
-        else:
-            self.qty_var.set("1")
+            self.refresh()
+            return
+        error = self._add_item_to_current_sale(item_id, quantity)
+        if error is not None:
+            show_error("Cannot add item", error, LogSource.ADD_TO_SALE)
+            return
+        self.qty_var.set("1")
+
+    def _add_item_to_current_sale(self, item_id: str, quantity: int) -> Exception | None:
+        error = None
+        try:
+            self.session.add_item_to_sale(item_id, quantity)
+        except (PosError, ValueError) as exc:
+            error = exc
         self.refresh()
+        return error
 
     def _on_quick_add_shortcut(self, _event):
         if self.app._current is not self:
@@ -275,15 +288,13 @@ class SaleScreen(ctk.CTkFrame):
             self.quick_qty_entry.focus_set()
             return "break"
 
-        try:
-            self.session.add_item_to_sale(item_id, quantity)
-        except (PosError, ValueError) as exc:
-            diagnostics.log_failure(LogSource.ADD_TO_SALE, str(exc))
-            self.quick_error_var.set(str(exc))
+        error = self._add_item_to_current_sale(item_id, quantity)
+        if error is not None:
+            diagnostics.log_failure(LogSource.ADD_TO_SALE, str(error))
+            self.quick_error_var.set(str(error))
             self.quick_item_entry.focus_set()
             return "break"
 
-        self.refresh()
         self.quick_item_var.set("")
         self.quick_qty_var.set("1")
         self.quick_error_var.set("")

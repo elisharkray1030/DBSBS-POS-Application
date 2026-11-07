@@ -35,3 +35,10 @@ def test_invalid_quantity_returns_explicit_error(raw: str) -> None:
     assert isinstance(result, QuickEntryError)
     assert result.field == "quantity"
     assert result.message
+
+
+def test_overlong_quantity_returns_explicit_error() -> None:
+    result = parse_quantity("9" * 5000)
+
+    assert isinstance(result, QuickEntryError)
+    assert result.field == "quantity"
