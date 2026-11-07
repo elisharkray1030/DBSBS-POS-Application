@@ -51,6 +51,25 @@ right. The screenshot uses sample data; its figures are illustrative.
     shows its sequence number and any cash change due. The current sale clears
     after a successful settlement, ready for the next customer.
 
+### Keyboard quick entry
+
+To add items without selecting them in the table, press `/` or keypad `/` when
+focus is outside an editable text field on the Sale screen. Type the Item ID in
+the quick-entry strip beside **Items**, then press Enter. The Qty field receives
+focus with `1` selected; type a different positive whole number, keep `1`, or
+leave Qty blank (blank defaults to `1`), then press Enter to add the item. On
+success, the Item ID clears, Qty returns to `1`, and focus returns to Item ID so
+you can enter the next item. Press Escape from either quick-entry field to clear
+the fields, leave quick entry, and return focus to the item list.
+
+Errors appear beside the quick-entry fields instead of in a dialog. An invalid
+Qty keeps focus on Qty; an empty, unknown, or sold-out Item ID keeps focus on
+Item ID. The entered values remain available to correct and retry. Slash is
+ordinary text while an editable field has focus and does not activate quick
+entry in dialogs or on other screens. The mouse **Add to sale** control below
+the item list also returns its Qty to `1` after a successful add; a failed add
+keeps the entered Qty.
+
 ### Payment choices
 
 The settlement dialog offers **Cash**, **Voucher**, **Octopus**, and
