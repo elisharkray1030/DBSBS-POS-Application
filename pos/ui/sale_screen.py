@@ -264,22 +264,24 @@ class SaleScreen(ctk.CTkFrame):
         return isinstance(widget, (tk.Entry, tk.Text, ttk.Entry, ttk.Combobox))
 
     def _quick_item_id_enter(self, _event):
-        item_id = parse_item_id(self.quick_item_var.get())
-        if isinstance(item_id, QuickEntryError):
-            self.quick_error_var.set(item_id.message)
-            self.quick_item_entry.focus_set()
+        if self._validated_quick_item_id() is None:
             return "break"
         self.quick_error_var.set("")
-        self.quick_qty_var.set("1")
         self.quick_qty_entry.focus_set()
         self.quick_qty_entry.select_range(0, "end")
         return "break"
 
-    def _quick_quantity_enter(self, _event):
+    def _validated_quick_item_id(self) -> str | None:
         item_id = parse_item_id(self.quick_item_var.get())
         if isinstance(item_id, QuickEntryError):
             self.quick_error_var.set(item_id.message)
             self.quick_item_entry.focus_set()
+            return None
+        return item_id
+
+    def _quick_quantity_enter(self, _event):
+        item_id = self._validated_quick_item_id()
+        if item_id is None:
             return "break"
 
         quantity = parse_quantity(self.quick_qty_var.get())
