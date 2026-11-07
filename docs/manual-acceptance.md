@@ -17,6 +17,10 @@ checks with a disposable device database and copies of valid Stock sheet CSVs.
   ordinary text in editable fields, including quick-entry fields and the inline
   sale Qty editor, and does not activate quick entry in a dialog or on another
   screen.
+- [ ] With a non-empty current sale, focus a non-editable area on Sale and press
+  F12. Verify it opens the existing Settle dialog and successfully settles the
+  sale. Verify F12 does not settle while an editable field has focus, from a
+  dialog, or on another screen.
 - [ ] Press Enter with Item ID empty. Verify inline feedback appears and focus
   stays on Item ID. Enter a valid ID and press Enter; verify Qty is `1` and
   selected. Change Qty and add with Enter; verify the sale updates, fields reset
@@ -31,9 +35,16 @@ checks with a disposable device database and copies of valid Stock sheet CSVs.
   the retained Qty can be used to retry.
 - [ ] Press Escape from either quick-entry field. Verify Item ID clears, Qty
   returns to `1`, quick entry exits, and focus returns to the item list.
-- [ ] With an item selected, use mouse **Add to sale** with a non-default Qty.
-  Verify Qty resets to `1` after success and remains unchanged after a failed
-  add.
+- [ ] Verify there is only one Qty control, in the quick-entry strip beside
+  **Items**, and that **Add to sale** and **Toggle sold-out** sit together in
+  the row below the item table. With an item selected, use mouse **Add to sale**
+  with a non-default shared Qty. Verify it adds that amount, resets Qty to `1`
+  after success, and retains Qty after a failed add. Verify blank Qty defaults
+  to `1`, while invalid, zero, and negative quantities are rejected and
+  retained.
+- [ ] Add multiple lines to the current sale and verify **Remove All** is
+  adjacent to **Remove**. Click **Remove All** and verify the current sale
+  clears without being settled or recorded.
 - [ ] At the 800×600 minimum window size, verify the quick-entry strip remains
   visible beside **Items**, the item table has useful visible rows, and no
   horizontal scrollbar is introduced.

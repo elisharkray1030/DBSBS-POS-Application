@@ -126,9 +126,6 @@ class SaleScreen(ctk.CTkFrame):
 
         controls = ctk.CTkFrame(left, fg_color="transparent")
         controls.pack(fill="x", pady=(0, 4))
-        ctk.CTkLabel(controls, text="Qty:").pack(side="left")
-        self.qty_var = tk.StringVar(value="1")
-        ctk.CTkEntry(controls, textvariable=self.qty_var, width=50).pack(side="left")
         ctk.CTkButton(
             controls, text="Add to sale", width=110, command=self._add_to_sale
         ).pack(side="left", padx=4)
@@ -154,6 +151,9 @@ class SaleScreen(ctk.CTkFrame):
         self._keypad_slash_binding = self.app.bind(
             "<KP_Divide>", self._on_quick_add_shortcut, add="+"
         )
+        self._f12_binding = self.app.bind(
+            "<F12>", self._on_settle_shortcut, add="+"
+        )
         self.bind("<Destroy>", self._on_destroy, add="+")
 
         sale_controls = ctk.CTkFrame(right, fg_color="transparent")
@@ -162,8 +162,8 @@ class SaleScreen(ctk.CTkFrame):
             sale_controls, text="Remove", width=80, command=self._remove_from_sale
         ).pack(side="left", padx=4)
         ctk.CTkButton(
-            sale_controls, text="New sale", width=90, command=self._new_sale
-        ).pack(side="right")
+            sale_controls, text="Remove All", width=100, command=self._remove_all
+        ).pack(side="left", padx=4)
 
         self.total_var = tk.StringVar()
         ctk.CTkLabel(
@@ -228,17 +228,18 @@ class SaleScreen(ctk.CTkFrame):
         item_id = self._selected_item_id()
         if item_id is None:
             return
-        try:
-            quantity = int(self.qty_var.get())
-        except ValueError as exc:
-            show_error("Cannot add item", exc, LogSource.ADD_TO_SALE)
+        quantity = parse_quantity(self.quick_qty_var.get())
+        if isinstance(quantity, QuickEntryError):
+            show_error(
+                "Cannot add item", ValueError(quantity.message), LogSource.ADD_TO_SALE
+            )
             self.refresh()
             return
         error = self._add_item_to_current_sale(item_id, quantity)
         if error is not None:
             show_error("Cannot add item", error, LogSource.ADD_TO_SALE)
             return
-        self.qty_var.set("1")
+        self.quick_qty_var.set("1")
 
     def _add_item_to_current_sale(self, item_id: str, quantity: int) -> Exception | None:
         error = None
@@ -257,6 +258,20 @@ class SaleScreen(ctk.CTkFrame):
             return None
         self.quick_error_var.set("")
         self.quick_item_entry.focus_set()
+        return "break"
+
+    def _on_settle_shortcut(self, _event):
+        if self.app._current is not self:
+            return None
+        if self.app.grab_current() is not None:
+            return None
+        focused = self.focus_get()
+        if focused is not None and (
+            focused.winfo_toplevel() is not self.winfo_toplevel()
+            or self._is_editable_text_widget(focused)
+        ):
+            return None
+        self._settle()
         return "break"
 
     @staticmethod
@@ -316,6 +331,7 @@ class SaleScreen(ctk.CTkFrame):
             return
         self.app.unbind("<slash>", self._slash_binding)
         self.app.unbind("<KP_Divide>", self._keypad_slash_binding)
+        self.app.unbind("<F12>", self._f12_binding)
 
     def _toggle_sold_out(self) -> None:
         item_id = self._selected_item_id()
@@ -417,7 +433,7 @@ class SaleScreen(ctk.CTkFrame):
         self.session.set_sale_quantity(item_id, 0)
         self.refresh()
 
-    def _new_sale(self) -> None:
+    def _remove_all(self) -> None:
         self.session.begin_sale()
         self.refresh()
 
