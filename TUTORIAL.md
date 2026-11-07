@@ -92,9 +92,10 @@ cashier still handles payment and uses the separate Octopus machine.
   select **Octopus** here and settle; the sale total is recorded automatically.
   Octopus must cover the entire sale by itself; it cannot be combined with cash
   or vouchers. The POS is not connected to the machine.
-- **Cash + Voucher:** enter the cash portion, the cash tendered, and the voucher
-  portion. Both portions must be positive and together equal the sale total;
-  the cash tendered must be at least the cash portion. For a single payment
+- **Cash + Voucher:** enter the notes/coins handed over as **Cash tendered** and
+  enter the **Voucher portion**. The POS calculates the cash portion as the sale
+  total minus the voucher portion. Both portions must be positive, and cash
+  tendered must be at least the calculated cash portion. For a single payment
   method, choose **Cash** or **Voucher** instead.
 
 If the amounts do not match the sale total, the POS rejects settlement; correct

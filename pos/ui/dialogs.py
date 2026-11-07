@@ -27,6 +27,16 @@ def fmt(amount: Decimal) -> str:
     return f"{amount:.2f}"
 
 
+def build_cash_voucher_tenders(
+    total: Decimal, voucher_portion: Decimal, cash_tendered: Decimal
+) -> list[Tender]:
+    cash_portion = total - voucher_portion
+    return [
+        Tender(CASH, cash_portion, tendered=cash_tendered),
+        Tender(VOUCHER, voucher_portion),
+    ]
+
+
 def show_error(title: str, exc: Exception, source: LogSource) -> None:
     messagebox.showerror(title, str(exc))
     diagnostics.log_failure(source, str(exc))
@@ -67,8 +77,11 @@ class TenderSection(ctk.CTkFrame):
             ).grid(row=1, column=column, sticky="w", padx=8, pady=4)
 
         self.cash_tendered = ctk.CTkEntry(self, width=110)
-        self.cash_portion = ctk.CTkEntry(self, width=110)
         self.voucher_portion = ctk.CTkEntry(self, width=110)
+        self.cash_tendered_label = ctk.CTkLabel(
+            self, text="Cash tendered (notes given)"
+        )
+        self.voucher_portion_label = ctk.CTkLabel(self, text="Voucher portion")
         self._update_fields()
 
     def set_total(self, total: Decimal) -> None:
@@ -76,24 +89,20 @@ class TenderSection(ctk.CTkFrame):
 
     def _update_fields(self) -> None:
         method = self.method.get()
+        self.cash_tendered_label.grid_remove()
+        self.voucher_portion_label.grid_remove()
         self.cash_tendered.grid_remove()
-        self.cash_portion.grid_remove()
         self.voucher_portion.grid_remove()
         if method == CASH:
-            self._label("Cash tendered (notes given)", 2, 0)
+            self.cash_tendered_label.configure(text="Cash tendered (notes given)")
+            self.cash_tendered_label.grid(row=2, column=0, sticky="e", padx=8, pady=4)
             self.cash_tendered.grid(row=2, column=1, padx=8, pady=4, sticky="w")
         elif method == "cash+voucher":
-            self._label("Cash portion", 2, 0)
-            self.cash_portion.grid(row=2, column=1, padx=8, pady=4, sticky="w")
-            self._label("Cash tendered", 3, 0)
-            self.cash_tendered.grid(row=3, column=1, padx=8, pady=4, sticky="w")
-            self._label("Voucher portion", 4, 0)
-            self.voucher_portion.grid(row=4, column=1, padx=8, pady=4, sticky="w")
-
-    def _label(self, text: str, row: int, column: int) -> None:
-        ctk.CTkLabel(self, text=text).grid(
-            row=row, column=column, sticky="e", padx=8, pady=4
-        )
+            self.cash_tendered_label.configure(text="Cash tendered")
+            self.cash_tendered_label.grid(row=2, column=0, sticky="e", padx=8, pady=4)
+            self.cash_tendered.grid(row=2, column=1, padx=8, pady=4, sticky="w")
+            self.voucher_portion_label.grid(row=3, column=0, sticky="e", padx=8, pady=4)
+            self.voucher_portion.grid(row=3, column=1, padx=8, pady=4, sticky="w")
 
     def build_tenders(self) -> list[Tender]:
         method = self.method.get()
@@ -105,12 +114,10 @@ class TenderSection(ctk.CTkFrame):
             return [Tender(VOUCHER, self.total)]
         if method == OCTOPUS:
             return [Tender(OCTOPUS, self.total)]
-        cash = money(self.cash_portion.get())
         voucher = money(self.voucher_portion.get())
-        return [
-            Tender(CASH, cash, tendered=money(self.cash_tendered.get())),
-            Tender(VOUCHER, voucher),
-        ]
+        return build_cash_voucher_tenders(
+            self.total, voucher, money(self.cash_tendered.get())
+        )
 
 
 class SettleDialog(ctk.CTkToplevel):

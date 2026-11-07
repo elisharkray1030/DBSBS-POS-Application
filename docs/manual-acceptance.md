@@ -21,6 +21,12 @@ checks with a disposable device database and copies of valid Stock sheet CSVs.
   F12. Verify it opens the existing Settle dialog and successfully settles the
   sale. Verify F12 does not settle while an editable field has focus, from a
   dialog, or on another screen.
+- [ ] For a $90 sale, choose **Cash + Voucher**. Verify the dialog shows only
+  **Cash tendered** and **Voucher portion**, with no **Cash portion** field.
+  Enter $50 for each and settle; verify the sale reports $10 change. Reopen the
+  dialog for another $90 sale, enter $39 cash tendered and $50 voucher portion,
+  and verify settlement is rejected because cash tendered is less than the
+  calculated $40 cash portion.
 - [ ] Press Enter with Item ID empty. Verify inline feedback appears and focus
   stays on Item ID. Enter a valid ID and press Enter; verify Qty is `1` and
   selected. Change Qty and add with Enter; verify the sale updates, fields reset
