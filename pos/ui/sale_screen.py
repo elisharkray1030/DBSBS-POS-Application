@@ -297,16 +297,17 @@ class SaleScreen(ctk.CTkFrame):
             self.quick_item_entry.focus_set()
             return "break"
 
-        self.quick_item_var.set("")
-        self.quick_qty_var.set("1")
-        self.quick_error_var.set("")
+        self._reset_quick_entry()
         self.quick_item_entry.focus_set()
         return "break"
 
-    def _exit_quick_add(self, _event):
+    def _reset_quick_entry(self) -> None:
         self.quick_item_var.set("")
         self.quick_qty_var.set("1")
         self.quick_error_var.set("")
+
+    def _exit_quick_add(self, _event):
+        self._reset_quick_entry()
         self.item_tree.focus_set()
         return "break"
 
