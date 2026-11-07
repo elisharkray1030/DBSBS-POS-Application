@@ -16,6 +16,11 @@ class QuickEntryError:
     message: str
 
 
+_INVALID_QUANTITY = QuickEntryError(
+    "quantity", "Qty must be a positive whole number."
+)
+
+
 def parse_item_id(raw: str) -> str | QuickEntryError:
     """Trim surrounding whitespace without interpreting an Item ID as a number."""
     item_id = raw.strip()
@@ -30,8 +35,8 @@ def parse_quantity(raw: str) -> int | QuickEntryError:
     if not quantity_text:
         return 1
     if not quantity_text.isdecimal():
-        return QuickEntryError("quantity", "Qty must be a positive whole number.")
+        return _INVALID_QUANTITY
     quantity = int(quantity_text)
     if quantity < 1:
-        return QuickEntryError("quantity", "Qty must be a positive whole number.")
+        return _INVALID_QUANTITY
     return quantity
