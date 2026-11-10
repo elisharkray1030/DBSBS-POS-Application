@@ -117,6 +117,17 @@ def test_tenders_must_sum_to_the_sale_total(configured_session):
         configured_session.settle_current_sale([Tender(CASH, Decimal("70"), tendered=Decimal("70"))])
 
 
+def test_zero_portion_is_rejected_when_combined_with_another_method(configured_session):
+    configured_session.add_item_to_sale("MUG", 1)  # 60
+    with pytest.raises(InvalidSettlement):
+        configured_session.settle_current_sale(
+            [
+                Tender(CASH, Decimal("60"), tendered=Decimal("60")),
+                Tender(VOUCHER, Decimal("0")),
+            ]
+        )
+
+
 def test_cash_tendered_less_than_cash_portion_is_rejected(configured_session):
     configured_session.add_item_to_sale("MUG", 1)  # 60
     with pytest.raises(InvalidSettlement):
