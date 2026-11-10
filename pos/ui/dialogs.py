@@ -27,14 +27,16 @@ def fmt(amount: Decimal) -> str:
     return f"{amount:.2f}"
 
 
-def build_cash_voucher_tenders(
-    total: Decimal, voucher_portion: Decimal, cash_tendered: Decimal
+def build_selected_tenders(
+    portions: dict[str, Decimal], cash_tendered: Decimal | None
 ) -> list[Tender]:
-    cash_portion = total - voucher_portion
-    return [
-        Tender(CASH, cash_portion, tendered=cash_tendered),
-        Tender(VOUCHER, voucher_portion),
-    ]
+    """Build one tender per selected method in the standard display order."""
+    tenders: list[Tender] = []
+    for method in (CASH, OCTOPUS, VOUCHER):
+        if method in portions:
+            tendered = cash_tendered if method == CASH else None
+            tenders.append(Tender(method, portions[method], tendered=tendered))
+    return tenders
 
 
 def show_error(title: str, exc: Exception, source: LogSource) -> None:
@@ -59,65 +61,83 @@ class TenderSection(ctk.CTkFrame):
     def __init__(self, master: tk.Misc, total: Decimal) -> None:
         super().__init__(master, corner_radius=8, border_width=1)
         self.total = total
-        self.method = tk.StringVar(value=CASH)
+        self.methods = (CASH, OCTOPUS, VOUCHER)
+        self.selected = {
+            method: tk.BooleanVar(self, value=method == CASH)
+            for method in self.methods
+        }
 
         ctk.CTkLabel(self, text="Settlement", font=style.FONT_SUBTITLE).grid(
-            row=0, column=0, columnspan=4, sticky="w", padx=8, pady=(8, 4)
+            row=0, column=0, columnspan=3, sticky="w", padx=8, pady=(8, 4)
         )
 
-        methods = [CASH, VOUCHER, OCTOPUS, "cash+voucher"]
-        labels = ["Cash", "Voucher", "Octopus", "Cash + Voucher"]
-        for column, (method, label) in enumerate(zip(methods, labels)):
-            ctk.CTkRadioButton(
+        labels = {CASH: "Cash", OCTOPUS: "Octopus", VOUCHER: "Voucher"}
+        for column, method in enumerate(self.methods):
+            ctk.CTkCheckBox(
                 self,
-                text=label,
-                value=method,
-                variable=self.method,
+                text=labels[method],
+                variable=self.selected[method],
                 command=self._update_fields,
             ).grid(row=1, column=column, sticky="w", padx=8, pady=4)
 
+        self.portion_entries: dict[str, ctk.CTkEntry] = {}
+        self.portion_labels: dict[str, ctk.CTkLabel] = {}
+        rows = {CASH: 2, OCTOPUS: 4, VOUCHER: 5}
+        for method in self.methods:
+            self.portion_labels[method] = ctk.CTkLabel(
+                self, text=f"{labels[method]} portion"
+            )
+            self.portion_entries[method] = ctk.CTkEntry(self, width=110)
+            self.portion_labels[method].grid(
+                row=rows[method], column=0, sticky="e", padx=8, pady=4
+            )
+            self.portion_entries[method].grid(
+                row=rows[method], column=1, padx=8, pady=4, sticky="w"
+            )
+
+        self.portion_entries[CASH].insert(0, fmt(total))
         self.cash_tendered = ctk.CTkEntry(self, width=110)
-        self.voucher_portion = ctk.CTkEntry(self, width=110)
-        self.cash_tendered_label = ctk.CTkLabel(
-            self, text="Cash tendered (notes given)"
+        self.cash_tendered_label = ctk.CTkLabel(self, text="Cash tendered")
+        self.cash_tendered_label.grid(
+            row=3, column=0, sticky="e", padx=8, pady=4
         )
-        self.voucher_portion_label = ctk.CTkLabel(self, text="Voucher portion")
+        self.cash_tendered.grid(row=3, column=1, padx=8, pady=4, sticky="w")
         self._update_fields()
 
     def set_total(self, total: Decimal) -> None:
+        cash_portion = self.portion_entries[CASH]
+        if cash_portion.get() == fmt(self.total):
+            cash_portion.delete(0, "end")
+            cash_portion.insert(0, fmt(total))
         self.total = total
 
     def _update_fields(self) -> None:
-        method = self.method.get()
-        self.cash_tendered_label.grid_remove()
-        self.voucher_portion_label.grid_remove()
-        self.cash_tendered.grid_remove()
-        self.voucher_portion.grid_remove()
-        if method == CASH:
-            self.cash_tendered_label.configure(text="Cash tendered (notes given)")
-            self.cash_tendered_label.grid(row=2, column=0, sticky="e", padx=8, pady=4)
-            self.cash_tendered.grid(row=2, column=1, padx=8, pady=4, sticky="w")
-        elif method == "cash+voucher":
-            self.cash_tendered_label.configure(text="Cash tendered")
-            self.cash_tendered_label.grid(row=2, column=0, sticky="e", padx=8, pady=4)
-            self.cash_tendered.grid(row=2, column=1, padx=8, pady=4, sticky="w")
-            self.voucher_portion_label.grid(row=3, column=0, sticky="e", padx=8, pady=4)
-            self.voucher_portion.grid(row=3, column=1, padx=8, pady=4, sticky="w")
+        for method in self.methods:
+            self.portion_labels[method].grid_remove()
+            self.portion_entries[method].grid_remove()
+        if self.selected[CASH].get():
+            self.portion_labels[CASH].grid()
+            self.portion_entries[CASH].grid()
+            self.cash_tendered_label.grid()
+            self.cash_tendered.grid()
+        else:
+            self.cash_tendered_label.grid_remove()
+            self.cash_tendered.grid_remove()
+        for method in (OCTOPUS, VOUCHER):
+            if self.selected[method].get():
+                self.portion_labels[method].grid()
+                self.portion_entries[method].grid()
 
     def build_tenders(self) -> list[Tender]:
-        method = self.method.get()
-        if method == CASH:
-            return [
-                Tender(CASH, self.total, tendered=money(self.cash_tendered.get()))
-            ]
-        if method == VOUCHER:
-            return [Tender(VOUCHER, self.total)]
-        if method == OCTOPUS:
-            return [Tender(OCTOPUS, self.total)]
-        voucher = money(self.voucher_portion.get())
-        return build_cash_voucher_tenders(
-            self.total, voucher, money(self.cash_tendered.get())
+        portions = {
+            method: money(self.portion_entries[method].get())
+            for method in self.methods
+            if self.selected[method].get()
+        }
+        cash_tendered = (
+            money(self.cash_tendered.get()) if CASH in portions else None
         )
+        return build_selected_tenders(portions, cash_tendered)
 
 
 class SettleDialog(ctk.CTkToplevel):

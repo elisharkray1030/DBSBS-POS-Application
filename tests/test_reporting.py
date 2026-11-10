@@ -29,6 +29,7 @@ from pos.domain import (
     Sale,
     Tender,
 )
+from tests.helpers import three_way_tenders
 
 T0 = datetime(2026, 8, 15, 9, 0, 0)
 
@@ -121,6 +122,22 @@ def test_end_of_day_tender_totals_and_expected_cash():
     assert figures.expected_cash == Decimal("560")
     assert figures.octopus_total == Decimal("60")
     assert figures.voucher_total == Decimal("15")
+
+
+def test_end_of_day_counts_each_portion_of_three_way_settlement():
+    sales = [
+        _sale(
+            1,
+            [("MUG", "Mug", 1, "60"), ("BDG", "Badge", 2, "15")],
+            three_way_tenders(),
+        )
+    ]
+
+    figures = reporting.build_end_of_day(Decimal("500"), sales, [], CATALOG)
+
+    assert figures.expected_cash == Decimal("540")
+    assert figures.octopus_total == Decimal("20")
+    assert figures.voucher_total == Decimal("30")
 
 
 def test_end_of_day_expected_cash_with_adjustments():

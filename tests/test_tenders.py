@@ -1,7 +1,7 @@
-"""03 — Voucher & Octopus tenders + split settlement.
+"""03 — Cash, Voucher & Octopus tenders + split settlement.
 
-Cash and vouchers may be combined freely; Octopus always settles the full
-sale amount on its own. Invalid settlements are rejected.
+Any non-empty combination of tender methods may settle a sale. Invalid
+settlements are rejected.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from pos.domain import (
     SaleNotFound,
     Tender,
 )
+from tests.helpers import three_way_tenders
 
 
 def test_sale_can_be_settled_by_voucher_alone(configured_session):
@@ -60,30 +61,52 @@ def test_voucher_covers_entire_sale_without_change(configured_session):
     assert result.change_due == Decimal("0")
 
 
-def test_partial_octopus_is_rejected(configured_session):
+def test_partial_octopus_can_be_combined_with_cash(configured_session):
     configured_session.add_item_to_sale("MUG", 2)  # 120
-    with pytest.raises(InvalidSettlement):
-        configured_session.settle_current_sale([Tender(OCTOPUS, Decimal("60"))])
+    result = configured_session.settle_current_sale(
+        [
+            Tender(OCTOPUS, Decimal("60")),
+            Tender(CASH, Decimal("60"), tendered=Decimal("70")),
+        ]
+    )
+    sale = configured_session.get_sale(1)
+    assert sale.tender_sum(OCTOPUS) == Decimal("60")
+    assert sale.tender_sum(CASH) == Decimal("60")
+    assert result.change_due == Decimal("10")
 
 
-def test_octopus_combined_with_any_other_method_is_rejected(configured_session):
+def test_octopus_can_be_combined_with_voucher(configured_session):
     configured_session.add_item_to_sale("MUG", 1)  # 60
+    configured_session.settle_current_sale(
+        [Tender(OCTOPUS, Decimal("30")), Tender(VOUCHER, Decimal("30"))]
+    )
+    sale = configured_session.get_sale(1)
+    assert sale.tender_sum(OCTOPUS) == Decimal("30")
+    assert sale.tender_sum(VOUCHER) == Decimal("30")
+
+
+def test_cash_octopus_and_voucher_can_settle_one_sale(configured_session):
+    configured_session.add_item_to_sale("MUG", 1)  # 60
+    configured_session.add_item_to_sale("BDG", 2)  # 30; total 90
+    result = configured_session.settle_current_sale(three_way_tenders())
+    sale = configured_session.get_sale(1)
+    assert sale.tender_sum(CASH) == Decimal("40")
+    assert sale.tender_sum(OCTOPUS) == Decimal("20")
+    assert sale.tender_sum(VOUCHER) == Decimal("30")
+    assert result.change_due == Decimal("10")
+
+
+@pytest.mark.parametrize("method", [CASH, OCTOPUS, VOUCHER])
+def test_a_method_cannot_appear_twice_in_one_settlement(configured_session, method):
+    configured_session.add_item_to_sale("MUG", 1)  # 60
+    duplicate_tenders = [Tender(method, Decimal("30")), Tender(method, Decimal("30"))]
+    if method == CASH:
+        duplicate_tenders = [
+            Tender(CASH, Decimal("30"), tendered=Decimal("30")),
+            Tender(CASH, Decimal("30"), tendered=Decimal("30")),
+        ]
     with pytest.raises(InvalidSettlement):
-        configured_session.settle_current_sale(
-            [
-                Tender(OCTOPUS, Decimal("30")),
-                Tender(CASH, Decimal("30"), tendered=Decimal("30")),
-            ]
-        )
-    configured_session.begin_sale()
-    configured_session.add_item_to_sale("MUG", 1)
-    with pytest.raises(InvalidSettlement):
-        configured_session.settle_current_sale(
-            [
-                Tender(OCTOPUS, Decimal("60")),
-                Tender(VOUCHER, Decimal("0")),
-            ]
-        )
+        configured_session.settle_current_sale(duplicate_tenders)
 
 
 def test_tenders_must_sum_to_the_sale_total(configured_session):
@@ -92,6 +115,17 @@ def test_tenders_must_sum_to_the_sale_total(configured_session):
         configured_session.settle_current_sale([Tender(CASH, Decimal("50"), tendered=Decimal("50"))])
     with pytest.raises(InvalidSettlement):
         configured_session.settle_current_sale([Tender(CASH, Decimal("70"), tendered=Decimal("70"))])
+
+
+def test_zero_portion_is_rejected_when_combined_with_another_method(configured_session):
+    configured_session.add_item_to_sale("MUG", 1)  # 60
+    with pytest.raises(InvalidSettlement):
+        configured_session.settle_current_sale(
+            [
+                Tender(CASH, Decimal("60"), tendered=Decimal("60")),
+                Tender(VOUCHER, Decimal("0")),
+            ]
+        )
 
 
 def test_cash_tendered_less_than_cash_portion_is_rejected(configured_session):

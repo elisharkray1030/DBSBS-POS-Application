@@ -11,4 +11,4 @@ The instinct is to integrate (drive the card reader from the app via an SDK). We
 ## Consequences
 
 - Octopus amounts in the app are cashier-entered and therefore error-prone; the sequence number per sale is the cross-check against the machine's report.
-- Octopus must always settle the full sale total on its own — it can't be split against cash or vouchers, since the app has no way to drive a partial tap.
+- Octopus may cover the full sale or a portion combined with Cash and/or Voucher. The cashier records the Octopus portion actually taken on the shared machine; the app still does not drive or verify the tap.
