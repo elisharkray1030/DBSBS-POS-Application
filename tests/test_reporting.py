@@ -29,6 +29,7 @@ from pos.domain import (
     Sale,
     Tender,
 )
+from tests.helpers import three_way_tenders
 
 T0 = datetime(2026, 8, 15, 9, 0, 0)
 
@@ -128,11 +129,7 @@ def test_end_of_day_counts_each_portion_of_three_way_settlement():
         _sale(
             1,
             [("MUG", "Mug", 1, "60"), ("BDG", "Badge", 2, "15")],
-            [
-                Tender(CASH, Decimal("40"), tendered=Decimal("50")),
-                Tender(OCTOPUS, Decimal("20")),
-                Tender(VOUCHER, Decimal("30")),
-            ],
+            three_way_tenders(),
         )
     ]
 

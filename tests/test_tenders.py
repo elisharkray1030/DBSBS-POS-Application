@@ -18,6 +18,7 @@ from pos.domain import (
     SaleNotFound,
     Tender,
 )
+from tests.helpers import three_way_tenders
 
 
 def test_sale_can_be_settled_by_voucher_alone(configured_session):
@@ -87,13 +88,7 @@ def test_octopus_can_be_combined_with_voucher(configured_session):
 def test_cash_octopus_and_voucher_can_settle_one_sale(configured_session):
     configured_session.add_item_to_sale("MUG", 1)  # 60
     configured_session.add_item_to_sale("BDG", 2)  # 30; total 90
-    result = configured_session.settle_current_sale(
-        [
-            Tender(CASH, Decimal("40"), tendered=Decimal("50")),
-            Tender(OCTOPUS, Decimal("20")),
-            Tender(VOUCHER, Decimal("30")),
-        ]
-    )
+    result = configured_session.settle_current_sale(three_way_tenders())
     sale = configured_session.get_sale(1)
     assert sale.tender_sum(CASH) == Decimal("40")
     assert sale.tender_sum(OCTOPUS) == Decimal("20")
