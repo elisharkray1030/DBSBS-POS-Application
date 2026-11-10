@@ -14,7 +14,7 @@ from decimal import Decimal
 import pytest
 
 from pos import reporting
-from pos.domain import CASH, OCTOPUS, ExportError, Tender
+from pos.domain import CASH, OCTOPUS, VOUCHER, ExportError, Tender
 
 
 def read_rows(path):
@@ -60,6 +60,22 @@ def test_sales_export_has_one_row_per_sale_with_all_fields(configured_session, t
     second = rows[2]
     assert second[1] == "2"
     assert second[7] == "30"
+
+
+def test_sales_export_writes_each_three_way_tender_portion(configured_session, tmp_path):
+    configured_session.add_item_to_sale("MUG", 1)
+    configured_session.add_item_to_sale("BDG", 2)
+    configured_session.settle_current_sale(
+        [
+            Tender(CASH, Decimal("40"), tendered=Decimal("50")),
+            Tender(OCTOPUS, Decimal("20")),
+            Tender(VOUCHER, Decimal("30")),
+        ]
+    )
+
+    row = read_rows(configured_session.export_csv(tmp_path)[0])[1]
+
+    assert row[5:] == ["90", "40", "20", "30"]
 
 
 def test_items_export_has_one_row_per_line_item(configured_session, tmp_path):

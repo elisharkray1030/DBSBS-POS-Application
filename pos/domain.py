@@ -264,16 +264,9 @@ def validate_settlement(tenders: list[Tender], total: Money) -> None:
         raise InvalidSettlement(
             f"Tenders total {tender_total} but the sale is {total}"
         )
-    octopus = [t for t in tenders if t.method == OCTOPUS]
-    if octopus and len(octopus) > 1:
-        raise InvalidSettlement("A sale can have only one Octopus tender")
-    if octopus:
-        if len(tenders) != 1:
-            raise InvalidSettlement("Octopus must settle the full sale on its own")
-        if octopus[0].amount != total:
-            raise InvalidSettlement(
-                "Octopus must equal the full sale amount; partial Octopus is rejected"
-            )
+    methods = [t.method for t in tenders]
+    if len(set(methods)) != len(methods):
+        raise InvalidSettlement("A sale can have only one tender per method")
 
 
 @dataclass

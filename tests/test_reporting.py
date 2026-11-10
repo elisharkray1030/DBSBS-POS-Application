@@ -123,6 +123,26 @@ def test_end_of_day_tender_totals_and_expected_cash():
     assert figures.voucher_total == Decimal("15")
 
 
+def test_end_of_day_counts_each_portion_of_three_way_settlement():
+    sales = [
+        _sale(
+            1,
+            [("MUG", "Mug", 1, "60"), ("BDG", "Badge", 2, "15")],
+            [
+                Tender(CASH, Decimal("40"), tendered=Decimal("50")),
+                Tender(OCTOPUS, Decimal("20")),
+                Tender(VOUCHER, Decimal("30")),
+            ],
+        )
+    ]
+
+    figures = reporting.build_end_of_day(Decimal("500"), sales, [], CATALOG)
+
+    assert figures.expected_cash == Decimal("540")
+    assert figures.octopus_total == Decimal("20")
+    assert figures.voucher_total == Decimal("30")
+
+
 def test_end_of_day_expected_cash_with_adjustments():
     sales = [
         _sale(
