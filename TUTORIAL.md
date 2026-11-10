@@ -80,23 +80,20 @@ ignored while an editable text field or a dialog has focus and on other screens.
 
 ### Payment choices
 
-The settlement dialog offers **Cash**, **Voucher**, **Octopus**, and
-**Cash + Voucher**. The payment method is a record for reconciliation; the
-cashier still handles payment and uses the separate Octopus machine.
+Choose any combination of **Cash**, **Octopus**, and **Voucher** in the
+settlement dialog. Enter a positive portion for each selected method; all
+portions together must equal the sale total. The payment methods are records for
+reconciliation; the cashier still handles payment and uses the separate Octopus
+machine.
 
-- **Cash:** enter the notes/coins handed over as **Cash tendered**. The amount
-  applied to the sale is the sale total; the dialog reports change due.
-- **Voucher:** select **Voucher**; the POS records the full sale total as paid
-  by voucher. The stall gives no change for vouchers.
-- **Octopus:** first take the full payment on the shared Octopus machine, then
-  select **Octopus** here and settle; the sale total is recorded automatically.
-  Octopus must cover the entire sale by itself; it cannot be combined with cash
-  or vouchers. The POS is not connected to the machine.
-- **Cash + Voucher:** enter the notes/coins handed over as **Cash tendered** and
-  enter the **Voucher portion**. The POS calculates the cash portion as the sale
-  total minus the voucher portion. Both portions must be positive, and cash
-  tendered must be at least the calculated cash portion. For a single payment
-  method, choose **Cash** or **Voucher** instead.
+- **Cash:** enter the **Cash portion** and the amount received as **Cash
+  tendered**. Cash tendered must be at least the Cash portion; the dialog reports
+  change due against the Cash portion.
+- **Voucher:** enter the **Voucher portion**. The stall gives no change for
+  vouchers.
+- **Octopus:** first take the Octopus portion on the shared machine, then record
+  that portion here. Octopus can cover all or part of the sale; the POS is not
+  connected to the machine.
 
 If the amounts do not match the sale total, the POS rejects settlement; correct
 the amounts and try again. Keep following the stall's normal handwritten order

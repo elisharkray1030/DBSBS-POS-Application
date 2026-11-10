@@ -113,7 +113,7 @@ The per-device reconciliation figures produced at the close of the event: expect
 _Avoid_: End of event, closing figures
 
 **Split settlement**:
-A sale paid by more than one payment method. Cash and vouchers may be combined freely, but Octopus always settles the full amount on its own.
+A sale paid by more than one payment method. Any non-empty combination of Cash, Octopus, and Voucher may be used; each method covers a positive portion, and the portions add up to the sale total. Cash tendered is recorded separately from the Cash portion so change is computed only against Cash.
 _Avoid_: Split payment, part payment
 
 **Sequence number**:

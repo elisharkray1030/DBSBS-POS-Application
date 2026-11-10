@@ -21,12 +21,18 @@ checks with a disposable device database and copies of valid Stock sheet CSVs.
   F12. Verify it opens the existing Settle dialog and successfully settles the
   sale. Verify F12 does not settle while an editable field has focus, from a
   dialog, or on another screen.
-- [ ] For a $90 sale, choose **Cash + Voucher**. Verify the dialog shows only
-  **Cash tendered** and **Voucher portion**, with no **Cash portion** field.
-  Enter $50 for each and settle; verify the sale reports $10 change. Reopen the
-  dialog for another $90 sale, enter $39 cash tendered and $50 voucher portion,
-  and verify settlement is rejected because cash tendered is less than the
-  calculated $40 cash portion.
+- [ ] For a $90 sale, verify the settlement dialog has Cash, Octopus, and Voucher
+  checkboxes. Select all three; verify a portion field appears for each method
+  and the Cash field label is exactly **Cash tendered**, with no mention of
+  notes. Enter $40 Cash, $20 Octopus, $30 Voucher, and $50 Cash tendered; settle
+  and verify $10 change. Reopen for another $90 sale, enter the same portions
+  and $39 Cash tendered, and verify
+  settlement is rejected because Cash tendered is less than the $40 Cash
+  portion.
+- [ ] Verify Cash-only, Voucher-only, and Octopus-only settlements still work.
+  Verify Cash + Voucher, Cash + Octopus, and Octopus + Voucher can each settle a
+  sale when their positive portions add up to its total. Verify zero portions,
+  mismatched totals, and no selected methods are rejected.
 - [ ] Press Enter with Item ID empty. Verify inline feedback appears and focus
   stays on Item ID. Enter a valid ID and press Enter; verify Qty is `1` and
   selected. Change Qty and add with Enter; verify the sale updates, fields reset

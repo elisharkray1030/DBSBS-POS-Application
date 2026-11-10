@@ -142,7 +142,7 @@ merges the two devices' reports by hand. See
 - **Setup** — load/select the Stock sheet CSV, enter the float, name the device.
 - **Sale** — scrollable item list with Item IDs, live remaining counts and
   sold-out dimming; keyboard quick entry with `/` or keypad `/`; running total,
-  settle by cash / voucher / Octopus / cash+voucher, cash adjustments,
+  settle with any combination of Cash / Voucher / Octopus, cash adjustments,
   corrections and voids; view/change the active Stock sheet.
 - **End of day** — expected cash (float + cash sales + adjustments), Octopus
   total, voucher total, per-item sold counts, voids list; export three files
@@ -154,9 +154,11 @@ checklist.
 
 ## Tenders
 
-- Cash and vouchers may be split across one sale in any combination.
-- Octopus always settles the full sale on its own; partial or combined Octopus
-  is rejected.
+- Any non-empty combination of Cash, Octopus, and Voucher can settle a sale;
+  each method has one positive portion and the portions must total the sale.
+- Cash portion is recorded separately from Cash tendered, and change is based
+  only on the Cash portion. Partial Octopus is recorded for reconciliation with
+  the shared machine.
 - A voucher spends in full with no change given; the app records the sale
   value covered by vouchers and shows the total voucher value per device.
 
